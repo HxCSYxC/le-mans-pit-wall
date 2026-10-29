@@ -225,6 +225,22 @@ kbd{font:600 11px/1 var(--f-data);padding:2px 5px;border:1px solid var(--rule-hi
 .mini-hit:active{transform:scale(.97)}
 .mini-hit kbd{background:rgba(0,0,0,.15);border-color:rgba(0,0,0,.25);color:#04140a}
 .mini-note{margin:0;font-size:11.5px;color:var(--mute)}
+.qt[data-k=spin] .call-tag{color:var(--stop)}.qt[data-k=spin] .call-tag::before{background:var(--stop)}
+.qt[data-k=brake] .call-tag{color:var(--sodium)}.qt[data-k=brake] .call-tag::before{background:var(--sodium)}
+.qt-dots{display:flex;gap:6px}
+.qt-dots i{width:12px;height:12px;border-radius:50%;background:var(--rule)}
+.qt-dots i.now{background:var(--ink)}.qt-dots i.ok{background:var(--go)}.qt-dots i.bad{background:var(--stop)}
+.qt-road .qt-sign{position:absolute;top:50%;transform:translate(-50%,-50%);font:700 11px/1 var(--f-data);color:var(--mute);pointer-events:none}
+.qt-road .qt-apex{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:repeating-linear-gradient(var(--stop) 0 5px,transparent 5px 9px)}
+.qt-spin{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center}
+.qt-arr{border:1px solid var(--rule-hi);background:var(--deck);color:var(--ink);border-radius:10px;padding:16px 0;font:800 30px/1 var(--f-disp);touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.qt-arr:active{transform:scale(.97)}
+.qt-arr:disabled{opacity:.5}
+.qt-big{width:96px;text-align:center;font:800 54px/1 var(--f-disp);color:var(--sodium)}
+.qt-big small{display:block;margin-top:4px;font:700 12px/1 var(--f-body);color:var(--ink-2)}
+.qt-big.ok{color:var(--go)}.qt-big.bad{color:var(--stop)}
+.qt-time{height:5px;border-radius:3px;background:var(--deck);overflow:hidden}
+.qt-time i{display:block;height:100%;background:var(--sodium)}
 @media (max-width:560px){.mini{padding:12px}.mini-hit{margin-left:0;width:100%;justify-content:center;padding:16px}.mini-hit kbd{display:none}.mini-car{width:96px}}
 
 /* ---------- team picker & badges ---------- */
@@ -688,7 +704,7 @@ input[type=checkbox]{accent-color:var(--sodium);width:15px;height:15px}
         <label><input type="checkbox" id="optDialog" checked> 入站時打開設定</label>
         <label><input type="checkbox" id="optAutoPause" checked> 事件自動暫停</label>
         <label><input type="checkbox" id="optPitCam" checked> 入站慢鏡頭</label>
-        <label><input type="checkbox" id="optMini" checked> 換胎小遊戲</label>
+        <label><input type="checkbox" id="optMini" checked> 小遊戲（換胎・剎車點・救車）</label>
       </div>
     </section>
 
@@ -722,6 +738,14 @@ input[type=checkbox]{accent-color:var(--sodium);width:15px;height:15px}
   </main>
 </div>
 
+<div class="mini qt" id="qt" hidden role="dialog" aria-labelledby="qtTitle">
+  <div class="mini-h"><div><span class="call-tag" id="qtTag"></span><b id="qtTitle"></b></div><div class="qt-dots" id="qtDots"></div></div>
+  <div id="qtBrake"><div class="mini-track qt-road" id="qTrack"><i class="mz-g" id="qZoneG"></i><i class="mz-p" id="qZoneP"></i><span class="qt-sign" id="qS150">150</span><span class="qt-sign" id="qS100">100</span><span class="qt-sign" id="qS50">50</span><i class="qt-apex" id="qApex"></i><i class="mz-c" id="qCursor"></i></div></div>
+  <div id="qtSpin" class="qt-spin"><button type="button" class="qt-arr" data-d="-1" aria-label="向左反軚">←</button><div class="qt-big" id="qtArrow"></div><button type="button" class="qt-arr" data-d="1" aria-label="向右反軚">→</button></div>
+  <div class="qt-time"><i id="qtBar"></i></div>
+  <div class="mini-f"><span class="mini-g" id="qtGrade"></span><button type="button" class="mini-hit" id="qtHit">剎！<kbd>空白鍵</kbd></button></div>
+  <p class="mini-note" id="qtNote"></p>
+</div>
 <div class="mini" id="mini" hidden role="dialog" aria-labelledby="miniTitle">
   <div class="mini-h">
     <div><span class="call-tag">換胎小遊戲</span><b id="miniTitle">撳掣緊螺絲！</b></div>
@@ -1229,6 +1253,11 @@ const who=c=>c.isPlayer?c.drivers[c.di].tag:`#${c.num}`;
 function incident(c){
   c.incidents++;c.clean=false;
   const r=rnd(),where=pick(ZONES).name;
+  // the player gets a chance to catch spins and off-track moments (not the big crashes)
+  if(c.isPlayer&&r<0.88&&qtOn()&&!G.qt&&!G.mini&&!G.modal){qtStart('spin',{r,where});return;}
+  incidentHit(c,r,where);
+}
+function incidentHit(c,r,where){
   if(r<0.55){
     const lost=rr(8,20);c.delay+=lost;
     if(c.isPlayer)radio(who(c),`Sorry！喺 ${where} 打咗個轉，蝕咗大約 ${Math.round(lost)} 秒。`,'bad',true);
@@ -1579,6 +1608,118 @@ function passEvent(c,o,gained){
   if(FX.length>6)FX.shift();
 }
 
+function attackOutcome(c,o,win,crashP){
+  c.callTry=(c.callTry||0)+1;
+  if(win){c.callWin=(c.callWin||0)+1;const nb=neighbour(c,-1);o.delay+=(nb&&nb.o===o?nb.s:1)+0.6;radio(who(c),`收到！喺 ${zoneNear(c)} 剎遲過佢！`,'go');return;}
+  c.delay+=rr(1.2,2.8);
+  if(rnd()<crashP){c.damage=Math.min(1,c.damage+rr(0.08,0.22));o.damage=Math.min(1,o.damage+rr(0.04,0.14));c.incidents++;radio(who(c),`撞到 #${o.num}！車頭有損傷（${Math.round(c.damage*100)}%）。`,'bad');}
+  else radio(who(c),'佢關咗門，搏唔入，蝕咗少少時間。','bad');
+}
+function defendOutcome(c,o,win,crashP){
+  c.callTry=(c.callTry||0)+1;c.tyre.wear+=0.02;
+  if(win){c.callWin=(c.callWin||0)+1;o.delay+=rr(0.8,1.8);radio(who(c),'守住咗！佢要等下一條直路。','go');return;}
+  const nb=neighbour(c,1);c.delay+=(nb&&nb.o===o?nb.s:0.5)+0.5;
+  if(rnd()<crashP){c.damage=Math.min(1,c.damage+rr(0.06,0.18));c.incidents++;radio(who(c),'佢硬插入嚟撞到我！','bad');}
+  else radio(who(c),'守唔住，佢喺外線過咗。','bad');
+}
+
+/* ================= quick-time mini-games: braking point + spin save ================= */
+const qtOn=()=>G.opt.mini!==false;
+// w shifts the base success chance; crash is the chance of contact when the move fails
+const BRAKE={perfect:{w:1,crash:0,label:'完美剎車點！'},good:{w:0.25,crash:0.08,label:'剎得幾好'},early:{w:-0.6,crash:0.02,label:'剎得太早'},late:{w:-0.4,crash:0.35,label:'剎得太遲，衝過咗位'}};
+const SPIN_WIN=[1.1,0.9,0.75];
+function qtStart(kind,data){
+  const c=me(),e=G.env;
+  if(kind==='brake'){
+    const o=G.cars[data.r],p=data.side==='attack'?attackP(c,o):defendP(c,o);
+    const pw=(0.02+0.045*p)*(1-0.25*e.wet)*(e.light<0.4?0.85:1);
+    G.qt={kind,data,p,st:'aim',el:0,dur:rr(1.5,1.9),zone:{c:rr(0.7,0.84),pw,gw:pw*2.6},hx:null,res:null,wait:0};
+  }else{
+    G.qt={kind,data,st:'aim',el:0,i:0,seq:SPIN_WIN.map(()=>rnd()<0.5?-1:1),res:[],wait:0};
+  }
+  renderQT();
+}
+// the car speeds towards the corner, so the marker accelerates across the bar
+const qtX=q=>Math.pow(q.el/q.dur,1.35);
+function qtHit(){
+  const q=G&&G.qt;if(!q||q.kind!=='brake'||q.st!=='aim')return;
+  const x=qtX(q),d=x-q.zone.c;
+  qtBrakeGrade(Math.abs(d)<=q.zone.pw?'perfect':Math.abs(d)<=q.zone.gw?'good':d<0?'early':'late',x);
+}
+function qtBrakeGrade(g,x){const q=G.qt;q.res=g;q.hx=x;q.st='sum';q.wait=1.3;renderQT();}
+function qtSteer(dir){
+  const q=G&&G.qt;if(!q||q.kind!=='spin'||q.st!=='aim')return;
+  q.res.push(dir===q.seq[q.i]);q.st='flash';q.wait=0.4;renderQT();
+}
+function qtTick(dt){
+  const q=G.qt;
+  if(q.st==='aim'){
+    q.el+=dt;
+    if(q.kind==='brake'){if(qtX(q)>=1)qtBrakeGrade('late',1);}
+    else if(q.el>SPIN_WIN[q.i]){q.res.push(false);q.st='flash';q.wait=0.4;}
+  }else{
+    q.wait-=dt;
+    if(q.wait<=0){
+      if(q.st==='flash'){q.i++;q.el=0;if(q.i>=q.seq.length){q.st='sum';q.wait=1.2;}else q.st='aim';}
+      else{qtClose();return;}
+    }
+  }
+  renderQT();
+}
+function qtClose(){
+  const q=G.qt,c=me();G.qt=null;
+  if(q.kind==='brake'){
+    const o=G.cars[q.data.r],b=BRAKE[q.res],win=q.res==='perfect'||rnd()<clamp(q.p+b.w,0.05,0.95);
+    c.brkN=(c.brkN||0)+1;if(q.res==='perfect')c.brkPerf=(c.brkPerf||0)+1;
+    if(o.state!=='run')radio('工程師','機會冇咗，對手已經唔喺度。','team');
+    else (q.data.side==='attack'?attackOutcome:defendOutcome)(c,o,win,b.crash);
+  }else{
+    const ok=q.res.filter(Boolean).length,{r,where}=q.data;
+    c.saveN=(c.saveN||0)+1;
+    if(ok===3){c.saveOk=(c.saveOk||0)+1;c.incidents--;const lost=rr(1.5,3);c.delay+=lost;radio(who(c),`喺 ${where} 甩尾，救返！只係蝕咗 ${lost.toFixed(1)} 秒。`,'go');}
+    else if(ok===2){const lost=rr(5,9);c.delay+=lost;radio(who(c),`喺 ${where} 打咗半個轉，車冇事，蝕咗 ${Math.round(lost)} 秒。`,'bad');}
+    else incidentHit(c,r,where);
+  }
+  renderQT();renderSlow();
+}
+function renderQT(){
+  const el=$('#qt'),q=G&&G.running?G.qt:null;
+  if(!q){el.hidden=true;return;}
+  el.hidden=false;el.dataset.k=q.kind;
+  const brake=q.kind==='brake',g=$('#qtGrade');
+  $('#qtBrake').hidden=!brake;$('#qtSpin').hidden=brake;$('#qtHit').hidden=!brake;
+  if(brake){
+    const o=G.cars[q.data.r],z=q.zone;
+    $('#qtTag').textContent=q.data.side==='attack'?'剎車點 · 攻擊':'剎車點 · 防守';
+    $('#qtTitle').textContent=q.data.side==='attack'?`剎遲過 #${o.num}！`:`守住內線，唔好俾 #${o.num} 剎入嚟！`;
+    $('#qtDots').innerHTML='';
+    $('#qZoneG').style.cssText=`left:${((z.c-z.gw)*100).toFixed(2)}%;width:${(z.gw*200).toFixed(2)}%`;
+    $('#qZoneP').style.cssText=`left:${((z.c-z.pw)*100).toFixed(2)}%;width:${(z.pw*200).toFixed(2)}%`;
+    [['#qS150',0.36],['#qS100',0.24],['#qS50',0.12]].forEach(([id,k])=>{$(id).style.left=((z.c-k)*100).toFixed(2)+'%';});
+    $('#qApex').style.left=Math.min(98,(z.c+0.12)*100).toFixed(2)+'%';
+    const x=q.st==='aim'?qtX(q):q.hx;
+    $('#qCursor').style.left=(clamp(x,0,1)*100).toFixed(2)+'%';
+    $('#qTrack').className='mini-track qt-road'+(q.res?' fl-'+(q.res==='early'?'miss':q.res):'');
+    $('#qtBar').style.width=(q.st==='aim'?(1-clamp(x,0,1))*100:0)+'%';
+    if(q.res){g.className='mini-g '+(q.res==='early'?'miss':q.res);g.textContent=BRAKE[q.res].label;}
+    else{g.className='mini-g';g.textContent=`基本成功率 ${pct(q.p)}`;}
+    $('#qtHit').disabled=q.st!=='aim';
+    $('#qtNote').textContent='綠色＝完美，一定成功；橙色都加分。太早剎會蝕機會，太遲剎會衝過位，有機會撞車。';
+  }else{
+    $('#qtTag').textContent='救車';
+    $('#qtTitle').textContent=`喺 ${q.data.where} 甩尾！快啲反軚！`;
+    $('#qtDots').innerHTML=q.seq.map((_,k)=>`<i class="${k<q.res.length?(q.res[k]?'ok':'bad'):k===q.i&&q.st==='aim'?'now':''}"></i>`).join('');
+    const a=$('#qtArrow'),i=Math.min(q.i,q.seq.length-1);
+    if(q.st==='sum'){const ok=q.res.filter(Boolean).length;a.className='qt-big '+(ok===3?'ok':ok===2?'':'bad');a.innerHTML=`${ok}/3<small>${ok===3?'救返！':ok===2?'打咗半個轉':'救唔切'}</small>`;}
+    else if(q.st==='flash'){const r=q.res[q.res.length-1];a.className='qt-big '+(r?'ok':'bad');a.innerHTML=`${r?'✓':'✗'}<small>${r?'啱':'錯／太慢'}</small>`;}
+    else{a.className='qt-big';a.innerHTML=`${q.seq[i]<0?'←':'→'}<small>反軚</small>`;}
+    document.querySelectorAll('#qtSpin .qt-arr').forEach(b=>{b.disabled=q.st!=='aim';});
+    $('#qtBar').style.width=(q.st==='aim'?(1-clamp(q.el/SPIN_WIN[i],0,1))*100:0)+'%';
+    g.className='mini-g';g.textContent=`${Math.min(q.i+1,3)} / 3`;
+    $('#qtNote').textContent='跟住箭咀撳方向鍵（← →）或者㩒掣反軚。3 下全中＝救返，2 下＝打半個轉，少過 2 下就照常失控。';
+  }
+}
+
 /* ================= tyre-change timing mini-game ================= */
 // wheel order matches the 3D car: front right, front left, rear right, rear left
 const MINI_WHEELS=['右前','左前','右後','左後'];
@@ -1663,11 +1804,8 @@ const CALLS={
       opts:[{k:'go',label:'搏爬頭',hint:`成功率約 ${pct(p)} · 失敗蝕 1–3s，有機會撞車`},{k:'slip',label:'跟車慳油',hint:'吸尾流 3 圈 · 油耗 −12%'},{k:'box',label:'本圈入站 Undercut',hint:'早佢入站，出嚟用新胎追'}],def:1};},
     act:{
       go(c,{r}){const o=G.cars[r];if(o.state!=='run'){radio('工程師','機會冇咗，前車已經唔喺度。','team');return;}
-        const p=attackP(c,o);c.callTry=(c.callTry||0)+1;
-        if(rnd()<p){c.callWin=(c.callWin||0)+1;const nb=neighbour(c,-1);o.delay+=(nb&&nb.o===o?nb.s:1)+0.6;radio(who(c),`收到！喺 ${zoneNear(c)} 剎遲過佢！`,'go');}
-        else{c.delay+=rr(1.2,2.8);
-          if(rnd()<0.18){c.damage=Math.min(1,c.damage+rr(0.08,0.22));o.damage=Math.min(1,o.damage+rr(0.04,0.14));c.incidents++;radio(who(c),`撞到 #${o.num}！車頭有損傷（${Math.round(c.damage*100)}%）。`,'bad');}
-          else radio(who(c),'佢關咗門，搏唔入，蝕咗少少時間。','bad');}},
+        if(qtOn()&&!G.callAuto){qtStart('brake',{side:'attack',r});return;}
+        attackOutcome(c,o,rnd()<attackP(c,o),0.18);},
       slip(c){c.slipUntil=G.t+3*c.curLT;radio('工程師','收到，跟車慳油，等佢犯錯。','team');},
       box(c){c.boxCall=true;radio('工程師','Box, box！本圈入站做 Undercut。','team');},
     }},
@@ -1676,10 +1814,9 @@ const CALLS={
       text:`後車平均每圈快你大約 ${Math.max(0,c.refLT-o.refLT).toFixed(1)}s，差距得返 ${gap.toFixed(1)}s。`,
       opts:[{k:'block',label:'守線',hint:`守得住約 ${pct(p)} · 輪胎多磨 2%，有機會碰撞`},{k:'let',label:'讓佢過，保輪胎',hint:'蝕大約 1s · 冇風險'},{k:'push',label:'全力反擊 3 圈',hint:'引擎轉全力 · 油耗同輪胎損耗增加'}],def:0};},
     act:{
-      block(c,{r}){const o=G.cars[r];if(o.state!=='run')return;const p=defendP(c,o);c.callTry=(c.callTry||0)+1;c.tyre.wear+=0.02;
-        if(rnd()<p){c.callWin=(c.callWin||0)+1;o.delay+=rr(0.8,1.8);radio(who(c),'守住咗！佢要等下一條直路。','go');}
-        else{const nb=neighbour(c,1);c.delay+=(nb&&nb.o===o?nb.s:0.5)+0.5;
-          if(rnd()<0.1){c.damage=Math.min(1,c.damage+rr(0.06,0.18));c.incidents++;radio(who(c),'佢硬插入嚟撞到我！','bad');}else radio(who(c),'守唔住，佢喺外線過咗。','bad');}},
+      block(c,{r}){const o=G.cars[r];if(o.state!=='run')return;
+        if(qtOn()&&!G.callAuto){qtStart('brake',{side:'defend',r});return;}
+        defendOutcome(c,o,rnd()<defendP(c,o),0.1);},
       let(c){const nb=neighbour(c,1);c.delay+=(nb?nb.s:0.5)+0.4;radio(who(c),'OK，讓佢過，唔同佢鬥。','team');},
       push(c){tempMode(c,'push',3);},
     }},
@@ -1760,7 +1897,9 @@ function chooseCall(i,auto){
   const call=G&&G.call;if(!call)return;const o=call.opts[i];if(!o)return;
   G.call=null;G.callsMade=(G.callsMade||0)+1;
   if(auto)radio('工程師',`時間到，照預設：${o.label}。`,'info');
+  G.callAuto=!!auto;
   CALLS[call.type].act[o.k](me(),call.data);
+  G.callAuto=false;
   renderCall();renderSlow();
 }
 
@@ -2160,7 +2299,7 @@ function renderLog(){
 }
 let callKey=null;
 function renderCall(){
-  const el=$('#call'),call=G&&G.running&&!G.mini?G.call:null;
+  const el=$('#call'),call=G&&G.running&&!G.mini&&!G.qt?G.call:null;
   if(!call){el.hidden=true;callKey=null;return;}
   const k=call.type+':'+call.title+':'+call.text;
   if(k!==callKey){
@@ -2171,7 +2310,7 @@ function renderCall(){
   el.hidden=false;
 }
 function renderToast(){
-  const show=G.running&&G.paused&&!G.modal&&!G.mini;
+  const show=G.running&&G.paused&&!G.modal&&!G.mini&&!G.qt;
   $('#toast').hidden=!show;
   $('#toast').style.bottom=G.call&&show?`calc(${$('#call').offsetHeight+28}px + env(safe-area-inset-bottom,0px))`:'';
   if(show)$('#toastTxt').textContent=G.pauseMsg?`已暫停：${G.pauseMsg}`:'已暫停';
@@ -2296,7 +2435,8 @@ function showEnd(){
   $('#endStats').innerHTML=[
     ['入站次數',c.stops],['維修站總時間',fmtMS(c.pitTime)],['個人最快',fmtLap(c.best)],
     ['意外',inc],['爬頭 / 被爬',`${c.passes||0} / ${c.passedBy||0}`],['攻防成功',`${c.callWin||0} / ${c.callTry||0}`],
-    ['換胎完美',`${c.miniPerf||0} / ${c.miniN||0}`],['最快停站',c.fastStop?c.fastStop.toFixed(1)+'s':'—'],['工程師抉擇',G.callsMade||0]
+    ['換胎完美',`${c.miniPerf||0} / ${c.miniN||0}`],['完美剎車點',`${c.brkPerf||0} / ${c.brkN||0}`],['救車成功',`${c.saveOk||0} / ${c.saveN||0}`],
+    ['最快停站',c.fastStop?c.fastStop.toFixed(1)+'s':'—'],['工程師抉擇',G.callsMade||0]
   ].map(([k,v])=>`<div><b>${v}</b><small>${k}</small></div>`).join('');
   // position chart
   const H=G.hist,n=G.cars.length,w=560,h=170,x0=28,y0=10,cw=w-x0-8,ch=h-y0-22;
@@ -2454,6 +2594,9 @@ function bindUI(){
   $('#optPitCam').addEventListener('change',e=>{if(G)G.opt.pitCam=e.target.checked;});
   $('#optMini').addEventListener('change',e=>{if(G)G.opt.mini=e.target.checked;});
   $('#miniHit').addEventListener('pointerdown',e=>{e.preventDefault();miniHit();});
+  $('#qtHit').addEventListener('pointerdown',e=>{e.preventDefault();qtHit();});
+  $('#qTrack').addEventListener('pointerdown',e=>{e.preventDefault();qtHit();});
+  document.querySelectorAll('#qtSpin .qt-arr').forEach(b=>b.addEventListener('pointerdown',e=>{e.preventDefault();qtSteer(+b.dataset.d);}));
   $('#mTrack').addEventListener('pointerdown',e=>{e.preventDefault();miniHit();});
   $('#miniHit').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();}});
   $('#pcSkip').addEventListener('click',()=>{if(G)G.pitSkip=true;STAGE.hud();});
@@ -2485,6 +2628,13 @@ function bindUI(){
     if(!G)return;
     const tag=(ev.target.tagName||'').toLowerCase();
     if(G.mini&&G.running){if(ev.key===' '||ev.key==='Enter'){ev.preventDefault();if(!ev.repeat)miniHit();}return;}
+    if(G.qt&&G.running){
+      if(ev.repeat)return;
+      if(ev.key===' '||ev.key==='Enter'){ev.preventDefault();qtHit();}
+      else if(ev.key==='ArrowLeft'||ev.key==='a'||ev.key==='A'){ev.preventDefault();qtSteer(-1);}
+      else if(ev.key==='ArrowRight'||ev.key==='d'||ev.key==='D'){ev.preventDefault();qtSteer(1);}
+      return;
+    }
     if(G.modal==='pit'){if(ev.key==='Enter'&&tag!=='button'){ev.preventDefault();commitPit();}return;}
     if(tag==='input'||tag==='textarea'||tag==='select')return;
     if(!G.running)return;
@@ -3017,16 +3167,18 @@ const STAGE=(()=>{
 let lastTs=0,slowTs=0;
 function frame(ts){
   const real=Math.min(0.1,Math.max(0,(ts-(lastTs||ts))/1000));lastTs=ts;
-  if(G&&G.running&&!G.paused&&!G.modal&&!G.mini){
+  if(G&&G.running&&!G.paused&&!G.modal&&!G.mini&&!G.qt){
     let sim=real*SPEEDS[G.speed];
     const pc=me();
     // pit cam: slow the whole race down so a stop plays out over about five seconds
     if(G.opt.pitCam!==false&&!G.pitSkip&&pc.state==='pit'&&!pc.hold&&pc.svc)sim=Math.min(sim,real*clamp(pc.pitTotal/5,10,90));
     // an open engineer call slows the race so there is time to read it
     if(G.call){sim=Math.min(sim,real*15);G.call.left-=real;$('#callTime').textContent=Math.ceil(Math.max(0,G.call.left));$('#callBar').style.width=clamp(G.call.left/CALL_SECS,0,1)*100+'%';if(G.call.left<=0)chooseCall(G.call.def,true);}
-    while(sim>1e-6&&G.running&&!G.paused&&!G.modal&&!G.mini){const h=Math.min(1,sim);step(h);sim-=h;}
+    while(sim>1e-6&&G.running&&!G.paused&&!G.modal&&!G.mini&&!G.qt){const h=Math.min(1,sim);step(h);sim-=h;}
   }
   if(G&&G.mini&&G.running){if(!G.paused)miniTick(real);else renderMini();}
+  // quick-time events keep running even if a radio call paused the race underneath them
+  if(G&&G.qt&&G.running)qtTick(real);
   if(G&&G.cars.length){renderCars();if(FX.length){const evs=FX.splice(0);evs.forEach((ev,i)=>uiOvertake(ev,i===evs.length-1));}}
   STAGE.update(real);
   if(ts-slowTs>110){slowTs=ts;if(G&&G.cars.length)renderSlow();STAGE.hud();}
@@ -3035,7 +3187,7 @@ function frame(ts){
 function boot(data){
   buildMap();bindUI();drawSky();STAGE.init();
   if(data&&data.G&&data.G.cars){
-    G=data.G;G.paused=true;
+    G=data.G;G.paused=true;G.qt=null;
     G.cars.forEach(c=>{c.sets=c.sets||{dry:TYRE_ALLOC.dry-1,wet:TYRE_ALLOC.wet};c.mods=c.mods||[];});
     setupRaceUI();
     if(G.ended){showEnd();}
