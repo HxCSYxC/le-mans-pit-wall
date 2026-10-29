@@ -773,7 +773,7 @@ input[type=checkbox]{accent-color:var(--sodium);width:15px;height:15px}
         <div class="teams" id="teamList"></div>
         <p class="team-note" id="teamNote"></p>
       </div>
-      <label class="fld"><span>你嘅名 · 跑完會上傳到朋友排行榜</span><input type="text" id="optName" maxlength="16" placeholder="唔填就唔上傳" autocomplete="nickname"></label>
+      <label class="fld"><span>你嘅名 · 跑完會上傳到朋友排行榜</span><input type="text" id="optName" maxlength="16" placeholder="唔填就用「匿名車手」" autocomplete="nickname"></label>
       <label class="fld" id="customWrap" hidden><span>自訂車隊名稱</span><input type="text" id="optTeam" maxlength="22" value="Harbour Racing" autocomplete="off"></label>
       <div class="fld"><span>難度</span>
         <div class="seg" data-opt="diff">
@@ -2280,12 +2280,10 @@ function endRace(){
   G.result={order:fin.map(x=>x.idx)};
   const pos=G.result.order.indexOf(c.idx)+1;
   try{const k='pitwall24-best';const b=JSON.parse(localStorage.getItem(k)||'{}');if(c.state!=='dnf'&&(!b[G.opt.diff]||pos<b[G.opt.diff])){b[G.opt.diff]=pos;localStorage.setItem(k,JSON.stringify(b));}}catch(err){}
-  G.upload=G.opt.name?'sending':'none';
+  G.upload='sending';
   showEnd();
-  if(G.opt.name){
-    const g=G;
-    lbSubmit(c,pos).then(id=>{g.upload='ok';g.uploadId=id;LB.mine=id;LB.rows=null;},()=>{g.upload='err';}).then(()=>{if(G===g)renderUpload();});
-  }
+  const g=G;
+  lbSubmit(c,pos).then(id=>{g.upload='ok';g.uploadId=id;LB.mine=id;LB.rows=null;},()=>{g.upload='err';}).then(()=>{if(G===g)renderUpload();});
 }
 function showEnd(){
   const c=me(),order=G.result.order.map(i=>G.cars[i]);
@@ -2319,13 +2317,24 @@ function showEnd(){
 function renderUpload(){
   const el=$('#endUp'),u=G.upload;
   el.className='end-up'+(u==='ok'?' ok':u==='err'?' err':'');
-  el.textContent=u==='sending'?'上傳成績中⋯':u==='ok'?`成績已上傳（${G.opt.name}）`:u==='err'?'上傳失敗，可能冇網絡':u==='none'?'冇填名，今場冇上傳':'';
+  el.textContent=u==='sending'?'上傳成績中⋯':u==='ok'?`成績已上傳（${G.opt.name||ANON}）`:u==='err'?'上傳失敗，可能冇網絡':'';
 }
 
 /* ================= friends leaderboard (Firestore REST) ================= */
 const FB={key:'AIzaSyBi5-R8mh2f8z_Vg69B5yHRVJ9DF6ppGpM',base:'https://firestore.googleapis.com/v1/projects/le-mans-pit-wall/databases/(default)/documents/scores'};
 const WX_NAME={dry:'乾地',mixed:'陣雨',wet:'雨戰'},DIFF_NAME={easy:'輕鬆',normal:'標準',hard:'困難'};
 const LB={diff:'normal',rows:null,mine:null,busy:false};
+const ANON='匿名車手';
+// random per-browser id so anonymous players can still be told apart in the Firebase console
+function deviceId(){
+  try{let d=localStorage.getItem('pitwall24-dev');if(!d){d=Math.random().toString(36).slice(2,10);localStorage.setItem('pitwall24-dev',d);}return d;}catch(err){return 'none';}
+}
+function logPlay(){
+  const S=v=>({stringValue:String(v)}),t=pickedTeam();
+  const fields={name:S(G.opt.name),team:S(String(t.team).slice(0,40)),num:S(String(t.num).slice(0,4)),diff:S(G.opt.diff),weather:S(G.opt.weather),
+    dev:S(deviceId()),mobile:{booleanValue:matchMedia('(pointer:coarse)').matches},ts:{timestampValue:new Date().toISOString()}};
+  fetch(FB.base.replace(/scores$/,'plays')+`?key=${FB.key}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fields})}).catch(()=>{});
+}
 function playerName(){
   const v=($('#optName').value||'').replace(/\s+/g,' ').trim().slice(0,16);
   try{localStorage.setItem('pitwall24-name',v);}catch(err){}
@@ -2333,8 +2342,8 @@ function playerName(){
 }
 async function lbSubmit(c,pos){
   const I=n=>({integerValue:String(Math.round(n))}),S=v=>({stringValue:String(v)});
-  const fields={name:S(G.opt.name),team:S(String(c.team).slice(0,40)),num:S(String(c.num).slice(0,4)),diff:S(G.opt.diff),weather:S(G.opt.weather),
-    pos:I(pos),laps:I(Math.max(0,c.lap-c.penLaps)),dnf:{booleanValue:c.state==='dnf'},cars:I(G.cars.length),ts:{timestampValue:new Date().toISOString()}};
+  const fields={name:S(G.opt.name||ANON),team:S(String(c.team).slice(0,40)),num:S(String(c.num).slice(0,4)),diff:S(G.opt.diff),weather:S(G.opt.weather),
+    dev:S(deviceId()),pos:I(pos),laps:I(Math.max(0,c.lap-c.penLaps)),dnf:{booleanValue:c.state==='dnf'},cars:I(G.cars.length),ts:{timestampValue:new Date().toISOString()}};
   const r=await fetch(`${FB.base}?key=${FB.key}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fields})});
   if(!r.ok)throw new Error('HTTP '+r.status);
   return (await r.json()).name.split('/').pop();
@@ -2427,7 +2436,7 @@ function bindUI(){
       g.querySelectorAll('button[data-val]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
     });
   });
-  $('#startForm').addEventListener('submit',ev=>{ev.preventDefault();newGame();});
+  $('#startForm').addEventListener('submit',ev=>{ev.preventDefault();newGame();logPlay();});
   $('#btnBoardStart').addEventListener('click',()=>openBoard(START.diff));
   $('#btnBoardEnd').addEventListener('click',()=>openBoard(G?G.opt.diff:START.diff));
   $('#lbClose').addEventListener('click',closeBoard);
