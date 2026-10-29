@@ -452,6 +452,10 @@ input[type=checkbox]{accent-color:var(--sodium);width:15px;height:15px}
 .pick b{font:700 14px/1 var(--f-data)}
 .pick span{font-size:11.5px;color:var(--mute);line-height:1.35}
 .pick[aria-pressed=true]{border-color:var(--sodium);background:var(--sodium-soft)}
+.pick.max b{color:var(--sodium)}
+.max-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px dashed var(--sodium);border-radius:8px;background:var(--sodium-soft);font:600 13px/1.4 var(--f-body);color:var(--ink)}
+.max-row input{accent-color:var(--sodium);width:16px;height:16px}
+.hero-24{cursor:default;user-select:none;-webkit-user-select:none}
 .pick[aria-pressed=true] b{color:var(--sodium)}
 .chk{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-2);cursor:pointer}
 .go{border:0;border-radius:8px;background:var(--go);color:#04140a;font:800 20px/1 var(--f-disp);letter-spacing:.1em;padding:16px;text-transform:uppercase;margin-top:4px}
@@ -837,9 +841,10 @@ input[type=checkbox]{accent-color:var(--sodium);width:15px;height:15px}
         <div class="pickers" data-opt="driver">
           <button type="button" class="pick" data-val="0" aria-pressed="true"><b>MAR</b><span>白金 · 最快，但較食胎</span></button>
           <button type="button" class="pick" data-val="1" aria-pressed="false"><b>WON</b><span>金 · 雨戰最強，好穩定</span></button>
-          <button type="button" class="pick" data-val="2" aria-pressed="false"><b>MOR</b><span>銀 · 慳胎耐力好，較慢</span></button>
+          <button type="button" class="pick" data-val="2" aria-pressed="false" id="pick3"><b>MOR</b><span>銀 · 慳胎耐力好，較慢</span></button>
         </div>
       </div>
+      <label class="max-row" id="maxWrap" hidden><input type="checkbox" id="optMax" checked><span>彩蛋解鎖：<b>Max Verstappen</b> 加盟你嘅車隊（代替 MOR）· 全能車手，只限玩家隊</span></label>
       <div class="fld"><span>起步輪胎（16:00 賽道約 40°C）</span>
         <div class="seg" data-opt="tyre">
           <button type="button" data-val="S" aria-pressed="false">軟胎 S</button>
@@ -994,6 +999,9 @@ const DRIVERS=[
   {name:'黃子軒',tag:'WON',grade:'金',skill:0.945,rain:0.98,tyre:0.95,stamina:1.08,cons:1.08,note:'雨戰最強、最穩定，濕地交俾佢最安心。'},
   {name:'森健太',tag:'MOR',grade:'銀',skill:0.885,rain:0.95,tyre:0.9,stamina:1.15,cons:1.0,note:'單圈最慢，但最慳胎、耐力最好；要揸夠 6 小時。'},
 ];
+// easter egg: an all-round driver that only the player's crew can sign
+const MAX_DRV={name:'Max Verstappen',tag:'VER',grade:'彩蛋',skill:1.0,rain:1.0,tyre:0.87,stamina:1.2,cons:1.15,note:'彩蛋全能車手：最快、雨戰最強、最慳胎、耐力同穩定性都係頂級。只限你嘅車隊。'};
+const crewList=()=>START.max?[DRIVERS[0],DRIVERS[1],MAX_DRV]:DRIVERS;
 // 2026 Le Mans Hypercar field, listed in 2026 finishing order. pace = green-flag race pace (s/lap),
 // rel = failure-rate multiplier, crew = stop-time multiplier, rain = s/lap lost at full wet, q = 2026 Hyperpole slot.
 // liv = approximate livery: body, monocoque/sidepods, accent. dot = bright colour for the map and timing tower.
@@ -1085,7 +1093,21 @@ const PIT_SLOTS=[];for(let k=0;k<24;k++)PIT_SLOTS.push(TRACK.offset(-26+k*4.6,10
 /* ================= state ================= */
 let G=null;
 const me=()=>G.cars[G.meIdx];
-const START={diff:'normal',weather:'mixed',driver:0,tyre:'M',team:TEAMS.findIndex(t=>t.num==='51')};
+const START={diff:'normal',weather:'mixed',driver:0,tyre:'M',team:TEAMS.findIndex(t=>t.num==='51'),max:false};
+let maxUnlocked=false;
+try{maxUnlocked=localStorage.getItem('pitwall24-max')==='1';START.max=maxUnlocked&&localStorage.getItem('pitwall24-max-on')!=='0';}catch(err){}
+function renderMaxPick(){
+  $('#maxWrap').hidden=!maxUnlocked;$('#optMax').checked=START.max;
+  const b=$('#pick3');b.classList.toggle('max',START.max);
+  b.innerHTML=START.max?'<b>VER</b><span>彩蛋 · 全能，乜都最強</span>':'<b>MOR</b><span>銀 · 慳胎耐力好，較慢</span>';
+}
+function unlockMax(){
+  if(maxUnlocked)return;
+  maxUnlocked=true;START.max=true;
+  try{localStorage.setItem('pitwall24-max','1');localStorage.setItem('pitwall24-max-on','1');}catch(err){}
+  renderMaxPick();
+  $('#bestLine').textContent='🦁 彩蛋解鎖！Max Verstappen 加盟咗你嘅車隊。';
+}
 function pickedTeam(){
   const t=TEAM_OPTS[START.team]||TEAMS[0];
   if(!t.custom)return t;
@@ -2098,7 +2120,7 @@ function newGame(){
   });
   G.cars.forEach(c=>{c.tyre={c:aiCompound(c,true),wear:0,laps:0};});
   const p=mkCar({num:sel.num,team:sel.team,mk:sel.mk,ab:sel.ab,car:sel.car,liv:sel.liv,color:sel.dot,q:sel.q,rel:sel.rel,crew:sel.crew,isPlayer:true,pace:racePace(sel)+DIFF_PACE[opt.diff],
-    drivers:DRIVERS.map(d=>Object.assign({},d,{stint:0,total:0,fatigue:0})),di:START.driver,tyre:{c:START.tyre,wear:0,laps:0},quiet:0});
+    drivers:crewList().map(d=>Object.assign({},d,{stint:0,total:0,fatigue:0})),di:START.driver,tyre:{c:START.tyre,wear:0,laps:0},quiet:0});
   G.cars.push(p);
   G.cars.forEach((c,i)=>{c.idx=i;c.noise=lapNoise();});
   G.meIdx=p.idx;
@@ -2719,7 +2741,7 @@ function renderTeamList(){
   $('#startForm .go').textContent=`綠旗 · 以 #${t.num} 出賽`;
 }
 function showStart(){
-  renderTeamList();
+  renderTeamList();renderMaxPick();
   try{const n=localStorage.getItem('pitwall24-name');if(n&&!$('#optName').value)$('#optName').value=n;}catch(err){}
   $('#startOv').hidden=false;$('#endOv').hidden=true;$('#pitOv').hidden=true;$('#toast').hidden=true;$('#mini').hidden=true;$('#call').hidden=true;
   try{const b=JSON.parse(localStorage.getItem('pitwall24-best')||'{}');const names={easy:'輕鬆',normal:'標準',hard:'困難'};const s=Object.keys(names).filter(k=>b[k]).map(k=>`${names[k]} P${b[k]}`);$('#bestLine').textContent=s.length?`最佳成績：${s.join(' · ')}`:'';}catch(err){}
@@ -2744,6 +2766,11 @@ function bindUI(){
   });
   $('#startForm').addEventListener('submit',ev=>{ev.preventDefault();newGame();logPlay();if(qtOn())qtStart('launch',{restart:false});});
   $('#btnBoardStart').addEventListener('click',()=>openBoard(START.diff));
+  // easter egg: tap the big 24 five times, or race under the name Verstappen / 33
+  let eggTaps=[];
+  $('.hero-24').addEventListener('click',()=>{const t=Date.now();eggTaps=eggTaps.filter(x=>t-x<2500);eggTaps.push(t);if(eggTaps.length>=5)unlockMax();});
+  $('#optName').addEventListener('input',e=>{if(/verstappen|^\s*(max|33)\s*$/i.test(e.target.value))unlockMax();});
+  $('#optMax').addEventListener('change',e=>{START.max=e.target.checked;try{localStorage.setItem('pitwall24-max-on',START.max?'1':'0');}catch(err){}renderMaxPick();});
   $('#btnBoardEnd').addEventListener('click',()=>openBoard(G?G.opt.diff:START.diff));
   $('#lbClose').addEventListener('click',closeBoard);
   $('#lbOv').addEventListener('click',e=>{if(e.target.id==='lbOv')closeBoard();});
