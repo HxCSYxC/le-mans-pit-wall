@@ -1,0 +1,2929 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>24h 維修站指揮官</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Saira+Condensed:wght@500;600;700;800&family=Saira:wght@400;500;600&display=swap">
+<style>
+:root{
+  /* Layout: night pit-wall console. Clock strip, 24h sky strip, then track map / car console / timing tower */
+  color-scheme:dark;
+  --night:#090e1a;
+  --deck:#0d1424;
+  --panel:#111a2c;
+  --panel-hi:#17223a;
+  --rule:#213052;
+  --rule-hi:#34477a;
+  --ink:#e8edf7;
+  --ink-2:#a9b4cd;
+  --mute:#6f7b99;
+  --sodium:#ffb547;
+  --sodium-ink:#1c1306;
+  --sodium-soft:rgba(255,181,71,.11);
+  --go:#3ccf7a;
+  --caution:#ffd23f;
+  --caution-ink:#15110a;
+  --stop:#ff5a5f;
+  --rain:#5aa9ff;
+  --violet:#a38bff;
+  --track:#1b2742;
+  --track-line:#56668e;
+  --t-S:#ff5a5f; --t-M:#ffd23f; --t-H:#e8edf7; --t-W:#5aa9ff;
+  --f-disp:"Saira Condensed","PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;
+  --f-body:"Saira","PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;
+  --f-data:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{background:var(--night)}
+body{background:var(--night);color:var(--ink);font:400 14px/1.45 var(--f-body);-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}
+button:disabled{cursor:not-allowed;opacity:.45}
+:focus-visible{outline:2px solid var(--sodium);outline-offset:2px}
+.mono,.num{font-family:var(--f-data);font-variant-numeric:tabular-nums}
+kbd{font:600 11px/1 var(--f-data);padding:2px 5px;border:1px solid var(--rule-hi);border-bottom-width:2px;border-radius:4px;color:var(--ink-2);background:var(--deck)}
+.wrap{max-width:1600px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px 96px;display:grid;gap:12px}
+
+/* ---------- header ---------- */
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 22px}
+.brand{display:flex;align-items:center;gap:10px;margin-right:auto}
+.brand-mark{font:800 40px/.8 var(--f-disp);color:var(--sodium);letter-spacing:-.02em}
+.brand-name{font:700 18px/1.1 var(--f-disp);letter-spacing:.06em}
+.brand-sub{font:500 10.5px/1.3 var(--f-data);color:var(--mute);letter-spacing:.04em;text-transform:uppercase}
+.clock{display:flex;align-items:flex-end;gap:20px}
+.cell small{display:block;font:600 10px/1.4 var(--f-disp);letter-spacing:.18em;color:var(--mute);text-transform:uppercase}
+.clock-big{font:700 40px/1 var(--f-disp);font-variant-numeric:tabular-nums;letter-spacing:.01em}
+.clock-mid{font:600 21px/1 var(--f-disp);font-variant-numeric:tabular-nums;color:var(--ink-2)}
+.flag{font:800 15px/1 var(--f-disp);letter-spacing:.12em;padding:10px 14px;border-radius:6px;min-width:128px;text-align:center;text-transform:uppercase;white-space:nowrap}
+.flag[data-f=green]{background:rgba(60,207,122,.12);color:var(--go);box-shadow:inset 0 0 0 1px rgba(60,207,122,.45)}
+.flag[data-f=slow]{background:rgba(255,210,63,.1);color:var(--caution);box-shadow:inset 0 0 0 1px var(--caution)}
+.flag[data-f=fcy]{background:var(--caution);color:var(--caution-ink)}
+.flag[data-f=sc]{background:repeating-linear-gradient(-45deg,var(--caution) 0 10px,#e3b52a 10px 20px);color:var(--caution-ink)}
+.flag[data-f=chequer]{background:var(--ink);color:var(--night)}
+.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.seg{display:flex;gap:2px;background:var(--deck);border:1px solid var(--rule);border-radius:8px;padding:3px}
+.seg button{border:0;background:transparent;padding:7px 11px;border-radius:5px;font:600 13px/1 var(--f-data);color:var(--ink-2);flex:1;white-space:nowrap}
+.seg button:hover{background:var(--panel-hi);color:var(--ink)}
+.seg button[aria-pressed=true]{background:var(--sodium);color:var(--sodium-ink)}
+.ghost{border:1px solid var(--rule);background:transparent;border-radius:8px;padding:8px 12px;font:600 12px/1 var(--f-disp);letter-spacing:.1em;color:var(--ink-2);text-transform:uppercase}
+.ghost:hover{border-color:var(--rule-hi);color:var(--ink)}
+.ghost.warn{border-color:var(--stop);color:var(--stop)}
+
+/* ---------- 3D stage ---------- */
+.stage{position:relative;height:clamp(230px,23vw,330px);border-radius:8px;overflow:hidden;border:1px solid var(--rule);background:linear-gradient(180deg,var(--panel-hi),var(--deck) 80%);isolation:isolate}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab;touch-action:pan-y}
+.stage canvas.flash{animation:stageIn .5s ease-out}
+@keyframes stageIn{from{opacity:0}to{opacity:1}}
+.stage-hud{position:absolute;inset:0 0 auto 0;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:12px 14px;pointer-events:none}
+.sh-eye{font:500 10.5px/1.3 var(--f-data);letter-spacing:.08em;color:var(--ink-2);text-transform:uppercase}
+.sh-team{font:800 26px/1.05 var(--f-disp);letter-spacing:.04em;text-shadow:0 2px 14px rgba(0,0,0,.65)}
+.sh-info{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.sh-info .pill{background:rgba(13,20,36,.72);backdrop-filter:blur(4px)}
+.sh-info .ty{width:14px;height:14px;font-size:8px;border-width:2px}
+.sh-hint{font:500 11px/1.3 var(--f-data);color:var(--mute)}
+.pitcam{position:absolute;inset:auto 0 0 0;display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;padding:22px 14px 12px;background:linear-gradient(0deg,rgba(9,14,26,.94) 35%,rgba(9,14,26,0))}
+.pc-live{display:flex;align-items:center;gap:7px;font:700 11px/1 var(--f-disp);letter-spacing:.22em;color:var(--stop)}
+.pc-live::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--stop);animation:blink 1s steps(2) infinite}
+.pc-time b{font:800 30px/1 var(--f-disp);font-variant-numeric:tabular-nums}
+.pc-time span{font:500 12px var(--f-data);color:var(--mute);margin-left:6px}
+.pc-steps{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:5px;min-width:0}
+.pc-steps li{font:600 12px/1.2 var(--f-body);padding:5px 9px;border-radius:99px;border:1px solid var(--rule-hi);color:var(--mute);background:rgba(13,20,36,.75)}
+.pc-steps li.done{color:var(--ink-2);border-color:var(--rule)}
+.pc-steps li.done::before{content:"✓ ";color:var(--go)}
+.pc-steps li.now{background:var(--sodium);border-color:var(--sodium);color:var(--sodium-ink)}
+.pc-skip{margin-left:auto;border:1px solid var(--rule-hi);background:rgba(13,20,36,.8);color:var(--ink-2);border-radius:7px;padding:8px 12px;font:600 12px/1 var(--f-body)}
+.pc-skip:hover{color:var(--ink);border-color:var(--sodium)}
+.stage-fallback{position:absolute;left:14px;right:14px;bottom:12px;margin:0;font-size:12.5px;color:var(--mute)}
+.stage.busy .sh-info{display:none}
+@media (max-width:560px){.sh-info{display:none}.sh-team{font-size:21px}.pc-time b{font-size:24px}.pc-steps li:not(.now){display:none}}
+
+/* ---------- overtake effects ---------- */
+.ot{position:absolute;left:0;right:0;bottom:0;padding:34px 16px 14px;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 14px;pointer-events:none;background:linear-gradient(0deg,rgba(9,14,26,.92) 35%,rgba(9,14,26,0));overflow:hidden;animation:otIn .4s cubic-bezier(.2,.9,.3,1.15)}
+.ot::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(105deg,transparent 0 26px,rgba(255,181,71,.13) 26px 28px);background-size:56px 100%;animation:otLines .5s linear infinite;-webkit-mask-image:linear-gradient(0deg,#000 20%,transparent);mask-image:linear-gradient(0deg,#000 20%,transparent)}
+.ot>*{position:relative}
+.ot-k{flex-basis:100%;font:700 11px/1 var(--f-disp);letter-spacing:.26em;color:var(--go)}
+.ot b{display:inline-block;font:800 46px/.95 var(--f-disp);letter-spacing:.02em;color:var(--sodium);transform:skewX(-10deg);text-shadow:0 6px 22px rgba(0,0,0,.55)}
+.ot-sub{font:600 14px/1.3 var(--f-body);color:var(--ink)}
+.ot.dn .ot-k,.ot.dn b{color:var(--stop)}
+.ot.dn::before{background-image:repeating-linear-gradient(105deg,transparent 0 26px,rgba(255,90,95,.13) 26px 28px)}
+.ot.lead b{color:var(--ink)}.ot.lead .ot-k{color:var(--sodium)}
+@keyframes otIn{from{transform:translateX(-60px);opacity:0}to{transform:none;opacity:1}}
+@keyframes otLines{to{background-position:-56px 0}}
+.burst{fill:none;stroke-width:2.2;animation:burst 1s ease-out forwards}
+.burst.b2{animation-delay:.18s;animation-fill-mode:both}
+.burst.up{stroke:var(--go)}.burst.dn{stroke:var(--stop)}
+.burst-t{font:800 11px var(--f-disp);letter-spacing:.04em;text-anchor:middle;animation:burstT 1.2s ease-out forwards}
+.burst-t.up{fill:var(--go)}.burst-t.dn{fill:var(--stop)}
+@keyframes burst{0%{transform:scale(1);opacity:1}100%{transform:scale(4);opacity:0}}
+@keyframes burstT{0%{transform:translateY(4px);opacity:0}20%{opacity:1}100%{transform:translateY(-10px);opacity:0}}
+.tt tr.fl-up td{animation:rowUp 1.5s ease-out}
+.tt tr.fl-dn td{animation:rowDn 1.5s ease-out}
+@keyframes rowUp{0%,25%{background:rgba(60,207,122,.32)}100%{background:transparent}}
+@keyframes rowDn{0%,25%{background:rgba(255,90,95,.28)}100%{background:transparent}}
+.pos{transform-origin:left bottom}
+.pos.bump-up{animation:bumpUp .9s cubic-bezier(.2,.9,.3,1.3)}
+.pos.bump-dn{animation:bumpDn .9s ease-out}
+@keyframes bumpUp{0%{transform:translateY(10px) scale(1.3);color:var(--go)}60%{color:var(--go)}100%{transform:none}}
+@keyframes bumpDn{0%{transform:translateY(-8px) scale(1.15);color:var(--stop)}60%{color:var(--stop)}100%{transform:none}}
+@media (max-width:560px){.ot b{font-size:34px}.ot-sub{font-size:12.5px}}
+
+/* ---------- drivers x tyres guide ---------- */
+.guide{padding:12px 14px 14px;display:grid;gap:14px}
+.tip{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:start;padding:12px;border-radius:8px;background:var(--sodium-soft);border:1px solid rgba(255,181,71,.35)}
+.tip>.ty{width:42px;height:42px;font-size:16px;border-width:5px}
+.tip b{display:block;font:800 22px/1.1 var(--f-disp);letter-spacing:.03em;margin-top:2px}
+.tip-cond{font:500 11.5px/1.4 var(--f-data);color:var(--ink-2);margin-top:4px}
+.tip p{margin:6px 0 0;font-size:12.5px;line-height:1.6;color:var(--ink-2)}
+.tip-warn{margin:8px 0 0;padding:8px 10px;border-radius:6px;background:rgba(90,169,255,.1);border:1px solid rgba(90,169,255,.3);color:var(--rain);font-size:12.5px;line-height:1.5}
+.ct-wrap{overflow-x:auto}
+.ct{width:100%;border-collapse:collapse;font:500 12px/1.2 var(--f-data);font-variant-numeric:tabular-nums}
+.ct th,.ct td{padding:6px 4px;text-align:center;border-bottom:1px solid rgba(33,48,82,.55);white-space:nowrap}
+.ct tbody th{text-align:left;font:600 11.5px/1.2 var(--f-body);color:var(--mute)}
+.ct thead th{vertical-align:bottom;padding-top:2px}
+.ct thead small{display:block;font:600 10px/1.2 var(--f-body);color:var(--mute);margin-top:4px}
+.ct .cpick{background:var(--sodium-soft);color:var(--ink)}
+.ct thead .cpick small{color:var(--sodium)}
+.dcards{display:grid;gap:8px}
+.dcard{display:grid;gap:8px;padding:10px 12px;border:1px solid var(--rule);border-radius:8px;background:var(--deck)}
+.dcard.on{border-color:rgba(255,181,71,.55)}
+.dc-h{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px}
+.dc-h b{font:700 15px/1 var(--f-data);color:var(--ink)}
+.dcard.on .dc-h b{color:var(--sodium)}
+.dc-h .nm{font-size:12.5px;color:var(--ink-2)}
+.dc-h em{margin-left:auto;font:500 11px/1.4 var(--f-data);color:var(--mute);font-style:normal}
+.traits{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:11.5px;color:var(--ink-2)}
+.traits>span{display:inline-flex;align-items:center;gap:6px}
+.pips{display:inline-flex;gap:2px}
+.pips i{width:7px;height:9px;border-radius:1.5px;background:var(--rule)}
+.pips i.on{background:var(--sodium)}
+.dc-t{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+.dc-t>span{display:flex;align-items:center;justify-content:center;gap:5px;padding:5px 4px;border-radius:5px;border:1px solid transparent;background:var(--panel);font:500 12px/1.2 var(--f-data);font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--ink-2)}
+.dc-t>span.best{border-color:var(--sodium);color:var(--ink)}
+.dc-t .ty{width:15px;height:15px;font-size:8px;border-width:2px}
+.dc-t .star{font-style:normal;font-size:10px;color:var(--violet)}
+.dc-note{margin:0;font-size:11.5px;line-height:1.5;color:var(--mute)}
+.g-foot{margin:0;font-size:11px;line-height:1.55;color:var(--mute)}
+@media (max-width:420px){.dc-t{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* ---------- engineer calls ---------- */
+.call{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:min(660px,calc(100% - 32px));z-index:35;display:grid;gap:10px;padding:14px 16px 0;background:var(--panel-hi);border:1px solid var(--sodium);border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.6);overflow:hidden;animation:callIn .35s cubic-bezier(.2,.9,.3,1.2)}
+@keyframes callIn{from{transform:translate(-50%,24px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+.call-h{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:start}
+.call-tag{display:inline-flex;align-items:center;gap:6px;font:700 11px/1 var(--f-disp);letter-spacing:.2em;color:var(--sodium);text-transform:uppercase}
+.call-tag::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--sodium);animation:blink 1s steps(2) infinite}
+.call-h b{display:block;margin-top:5px;font:800 21px/1.15 var(--f-disp);letter-spacing:.02em;text-wrap:balance}
+.call-t{font:800 26px/1 var(--f-disp);font-variant-numeric:tabular-nums;color:var(--ink-2)}
+.call p{margin:0;font-size:13.5px;line-height:1.55;color:var(--ink-2)}
+.call-opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px}
+.copt{display:grid;grid-template-columns:auto minmax(0,1fr);gap:3px 9px;align-items:center;padding:10px 12px;text-align:left;border:1px solid var(--rule-hi);border-radius:8px;background:var(--deck)}
+.copt kbd{grid-row:span 2}
+.copt b{font:700 14px/1.25 var(--f-body);color:var(--ink)}
+.copt span{font-size:11.5px;line-height:1.4;color:var(--mute)}
+.copt:hover{border-color:var(--sodium);background:var(--panel)}
+.copt.def{border-color:rgba(255,181,71,.5)}
+.copt.def b::after{content:"預設";margin-left:6px;font:600 10px var(--f-disp);letter-spacing:.1em;color:var(--sodium)}
+.call-bar{height:4px;margin:2px -16px 0;background:var(--deck)}
+.call-bar i{display:block;height:100%;width:100%;background:var(--sodium)}
+.alloc{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;font:600 12px/1 var(--f-data);color:var(--ink-2)}
+.alloc b{font-weight:600;color:var(--ink)}
+.sets{display:inline-flex;gap:2px}
+.sets i{width:6px;height:11px;border-radius:1px;background:var(--rule)}
+.sets i.on{background:var(--ink-2)}
+.sets.wet i.on{background:var(--rain)}
+.alloc .warn{color:var(--caution)}
+.tyopt .left{font:600 10px/1.2 var(--f-data);color:var(--ink-2)}
+@media (max-width:560px){.call{padding:12px 12px 0}.call-bar{margin:2px -12px 0}.call-h b{font-size:18px}.call-opts{grid-template-columns:minmax(0,1fr)}}
+
+/* ---------- tyre-change mini-game ---------- */
+.mini{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:min(580px,calc(100% - 32px));z-index:36;display:grid;gap:12px;padding:14px 16px;background:var(--panel-hi);border:1px solid var(--go);border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.6);animation:callIn .3s cubic-bezier(.2,.9,.3,1.2)}
+.mini-h{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center}
+.mini-h .call-tag{color:var(--go)}
+.mini-h .call-tag::before{background:var(--go)}
+.mini-h b{display:block;margin-top:5px;font:800 22px/1.1 var(--f-disp);letter-spacing:.03em}
+.mini-car{display:block;width:118px;height:auto}
+.mc-body{fill:var(--sodium)}
+.mc-cab{fill:var(--night)}
+.mc-w{fill:var(--rule-hi);transition:fill .15s}
+.mc-w.now{fill:var(--ink);animation:blink .5s steps(2) infinite}
+.mc-w.perfect{fill:var(--go)}.mc-w.good{fill:var(--caution)}.mc-w.miss,.mc-w.late{fill:var(--stop)}
+.mini-track{position:relative;height:36px;border-radius:6px;background:var(--deck);overflow:hidden;box-shadow:inset 0 0 0 1px var(--rule);touch-action:manipulation}
+.mz-g,.mz-p,.mz-c{position:absolute;top:0;bottom:0}
+.mz-g{background:rgba(255,181,71,.3)}
+.mz-p{background:rgba(60,207,122,.6)}
+.mz-c{width:4px;margin-left:-2px;background:var(--ink);box-shadow:0 0 10px rgba(255,255,255,.7)}
+.mini-track.fl-perfect{box-shadow:inset 0 0 0 2px var(--go),0 0 22px rgba(60,207,122,.45)}
+.mini-track.fl-good{box-shadow:inset 0 0 0 2px var(--caution)}
+.mini-track.fl-miss,.mini-track.fl-late{box-shadow:inset 0 0 0 2px var(--stop);animation:shake .3s}
+@keyframes shake{25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+.mini-f{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
+.mini-g{font:700 15px/1.3 var(--f-body);color:var(--ink-2)}
+.mini-g.perfect{color:var(--go)}.mini-g.good{color:var(--caution)}.mini-g.miss,.mini-g.late{color:var(--stop)}
+.mini-hit{margin-left:auto;display:flex;align-items:center;gap:10px;border:0;border-radius:8px;padding:12px 24px;background:var(--go);color:#04140a;font:800 22px/1 var(--f-disp);letter-spacing:.1em;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.mini-hit:active{transform:scale(.97)}
+.mini-hit kbd{background:rgba(0,0,0,.15);border-color:rgba(0,0,0,.25);color:#04140a}
+.mini-note{margin:0;font-size:11.5px;color:var(--mute)}
+@media (max-width:560px){.mini{padding:12px}.mini-hit{margin-left:0;width:100%;justify-content:center;padding:16px}.mini-hit kbd{display:none}.mini-car{width:96px}}
+
+/* ---------- team picker & badges ---------- */
+.teams{display:grid;gap:3px;max-height:290px;overflow-y:auto;padding:4px;border:1px solid var(--rule);border-radius:8px;background:var(--deck)}
+.trow{display:grid;grid-template-columns:46px minmax(0,1fr) auto;gap:10px;align-items:center;padding:7px 8px;border:1px solid transparent;border-radius:6px;background:transparent;text-align:left;color:var(--ink-2)}
+.trow:hover{background:var(--panel)}
+.trow[aria-pressed=true]{border-color:var(--sodium);background:var(--sodium-soft)}
+.tnum{display:grid;place-items:center;height:26px;padding-right:8px;border-radius:4px;font:700 13px/1 var(--f-data);background:var(--a);color:var(--t);box-shadow:inset -5px 0 0 var(--b),inset -8px 0 0 var(--c)}
+.tname{min-width:0}
+.tname b{display:block;font:600 13.5px/1.25 var(--f-body);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tname small{display:block;font:500 11px/1.35 var(--f-data);color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tstat{display:grid;grid-template-columns:auto auto;gap:2px 6px;align-items:center;font-size:10.5px;line-height:1;color:var(--mute)}
+.tstat .pips i{width:5px;height:7px}
+.team-note{margin:6px 0 0;font-size:12px;line-height:1.5;color:var(--ink-2)}
+.disclaimer{margin:18px 0 0;font-size:11.5px;line-height:1.6;color:var(--mute);max-width:52ch}
+.mkb{display:inline-block;margin-right:6px;padding:3px 4px;border-radius:3px;font:700 9.5px/1 var(--f-data);letter-spacing:.04em;background:var(--a);color:var(--t);box-shadow:inset -3px 0 0 var(--c);vertical-align:1px}
+@media (max-width:420px){.trow{grid-template-columns:42px minmax(0,1fr)}.tstat{display:none}}
+
+/* ---------- 24h sky strip ---------- */
+.sky canvas{display:block;width:100%;height:30px;border-radius:5px}
+.sky-labels{position:relative;height:13px;margin-top:5px;font:500 10px/1 var(--f-data);color:var(--mute)}
+.sky-labels span{position:absolute;top:0;transform:translateX(-50%)}
+.sky-labels span:first-child{transform:none}
+.sky-labels span:last-child{transform:translateX(-100%)}
+
+/* ---------- grid ---------- */
+.grid{display:grid;gap:12px;grid-template-columns:minmax(290px,350px) minmax(330px,1fr) minmax(430px,1.3fr);align-items:start}
+.col{display:flex;flex-direction:column;gap:12px;min-width:0}
+.a-map{grid-area:map}.a-con{grid-area:console}.a-tower{grid-area:tower}.a-radar{grid-area:radar}.a-radio{grid-area:radio}.a-guide{grid-area:guide}
+@media (max-width:1240px){.col{display:contents}.grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"console map" "guide tower" "radar radio"}}
+@media (max-width:760px){.grid{grid-template-columns:minmax(0,1fr);grid-template-areas:"console" "guide" "map" "tower" "radar" "radio"}}
+.panel{background:var(--panel);border:1px solid var(--rule);border-radius:8px;min-width:0}
+.ph{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--rule);font:700 12px/1.2 var(--f-disp);letter-spacing:.16em;color:var(--ink-2);text-transform:uppercase}
+.ph em{font:500 11px var(--f-data);letter-spacing:0;color:var(--mute);font-style:normal;text-transform:none}
+
+/* ---------- map ---------- */
+.map svg{display:block;width:100%;height:auto;max-height:560px}
+.map-bg{fill:var(--deck)}
+.trk-edge{fill:none;stroke:var(--track);stroke-width:11;stroke-linejoin:round;stroke-linecap:round}
+.trk-line{fill:none;stroke:var(--track-line);stroke-width:1.8;stroke-linejoin:round;transition:stroke .4s}
+svg[data-f=sc] .trk-line,svg[data-f=fcy] .trk-line{stroke:var(--caution)}
+svg[data-f=fcy] .trk-line{stroke-dasharray:6 5}
+.slowz{fill:none;stroke:var(--caution);stroke-width:11;stroke-linecap:round;opacity:.38}
+.pitlane{fill:none;stroke:var(--rule-hi);stroke-width:3;stroke-linecap:round}
+.sf{stroke:var(--ink);stroke-width:2.2}
+.lbl{font:600 9.5px var(--f-disp);letter-spacing:.1em;fill:var(--mute);text-transform:uppercase}
+.lbl.big{font-size:12px;letter-spacing:.5em;fill:var(--rule-hi)}
+.night-ov{fill:#02040a;pointer-events:none}
+.rain-ov{pointer-events:none}
+.car circle.dot{stroke:var(--night);stroke-width:1.4}
+.car text{font:700 6.6px var(--f-data);fill:var(--caution-ink);text-anchor:middle;dominant-baseline:central}
+.car.me text{font-size:7.4px}
+.car .ring{fill:none;stroke:var(--sodium);stroke-width:1.4;opacity:.6}
+.car.limp{animation:blink .8s steps(2) infinite}
+.car.boxing .ring{animation:pulse 1s ease-in-out infinite}
+svg.dark .car circle.dot{filter:drop-shadow(0 0 2.5px rgba(255,236,190,.65))}
+@keyframes blink{50%{opacity:.2}}
+@keyframes pulse{50%{stroke-width:3;opacity:1}}
+
+/* ---------- console ---------- */
+.con{padding:14px;display:grid;gap:14px}
+.con-head{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:end}
+.pos{font:800 66px/.78 var(--f-disp);color:var(--sodium);letter-spacing:-.03em}
+.who{min-width:0}
+.who-team{display:flex;align-items:center;gap:8px;font:700 19px/1.15 var(--f-disp);letter-spacing:.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.numchip{display:inline-grid;place-items:center;min-width:30px;height:20px;padding:0 5px;border-radius:4px;background:var(--cc,var(--sodium));color:var(--caution-ink);font:700 12px/1 var(--f-data)}
+.who-gaps{font:500 12px/1.5 var(--f-data);color:var(--ink-2);margin-top:4px}
+.who-gaps b{color:var(--ink);font-weight:600}
+.lapbox{text-align:right}
+.lapbox small,.lbl-s{display:block;font:600 10px/1.4 var(--f-disp);letter-spacing:.18em;color:var(--mute);text-transform:uppercase}
+.lapbox b{font:700 34px/1 var(--f-disp);font-variant-numeric:tabular-nums}
+.times{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:10px 12px;background:var(--deck);border-radius:6px}
+.times div{min-width:0}
+.times span{font:500 15px/1.2 var(--f-data);font-variant-numeric:tabular-nums}
+.times .purple{color:var(--violet)}
+.status{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font:500 12.5px/1.3 var(--f-body);color:var(--ink-2);min-height:24px}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:99px;font:600 11.5px/1.3 var(--f-body);background:var(--panel-hi);color:var(--ink-2);border:1px solid var(--rule)}
+.pill.bad{color:var(--stop);border-color:rgba(255,90,95,.45);background:rgba(255,90,95,.08)}
+.pill.warn{color:var(--caution);border-color:rgba(255,210,63,.4);background:rgba(255,210,63,.07)}
+.pill.ok{color:var(--go);border-color:rgba(60,207,122,.4)}
+.gauges{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px}
+.g-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.g-lab{font:600 11px/1 var(--f-disp);letter-spacing:.16em;color:var(--mute);text-transform:uppercase;display:flex;align-items:center;gap:6px}
+.g-val{font:600 14px/1 var(--f-data);font-variant-numeric:tabular-nums}
+.g-bar{position:relative;height:9px;margin-top:7px;border-radius:2px;background:var(--deck);overflow:hidden}
+.g-bar i{position:absolute;inset:0 auto 0 0;background:var(--go);border-radius:2px;transition:width .25s}
+.g-bar.ticks::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 calc(var(--lap,7.3%) - 1.5px),var(--night) calc(var(--lap,7.3%) - 1.5px) var(--lap,7.3%));opacity:.85}
+.g-sub{font:500 11.5px/1.3 var(--f-data);color:var(--mute);margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ty{display:inline-grid;place-items:center;width:17px;height:17px;border-radius:50%;border:2.5px solid var(--tc,var(--t-M));font:700 9px/1 var(--f-data);color:var(--ink);background:var(--night)}
+.ty-S{--tc:var(--t-S)}.ty-M{--tc:var(--t-M)}.ty-H{--tc:var(--t-H)}.ty-W{--tc:var(--t-W)}
+.crew{display:grid;gap:4px}
+.crew-row{display:grid;grid-template-columns:44px minmax(0,1fr) 92px 70px;gap:10px;align-items:center;padding:6px 8px;border-radius:5px;font:500 12px/1.2 var(--f-data);color:var(--ink-2)}
+.crew-row.on{background:var(--sodium-soft);color:var(--ink)}
+.crew-row b{font:700 13px/1 var(--f-data);color:var(--ink)}
+.crew-row .nm{font:500 12.5px/1.2 var(--f-body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crew-row .grade{font:600 10px/1 var(--f-disp);letter-spacing:.08em;color:var(--mute);margin-left:4px}
+.minbar{display:block;position:relative;height:4px;margin-top:4px;background:var(--deck);border-radius:2px}
+.minbar i{position:absolute;inset:0 auto 0 0;background:var(--ink-2);border-radius:2px}
+.minbar i.done{background:var(--go)}
+.minbar::after{content:"";position:absolute;left:42.86%;top:-2px;bottom:-2px;width:1.5px;background:var(--caution)}
+.fat{height:6px;background:var(--deck);border-radius:3px;overflow:hidden}
+.fat i{display:block;height:100%;background:var(--go)}
+.crew-cap{display:grid;grid-template-columns:44px minmax(0,1fr) 92px 70px;gap:10px;padding:0 8px;font:600 9.5px/1 var(--f-disp);letter-spacing:.14em;color:var(--mute);text-transform:uppercase}
+.modes{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:center}
+.modes .seg button{font-family:var(--f-body);font-size:13px;padding:8px 6px}
+.box{position:relative;display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;border:0;border-radius:8px;padding:14px 16px;background:var(--sodium);color:var(--sodium-ink);text-align:left;overflow:hidden}
+.box b{font:800 30px/1 var(--f-disp);letter-spacing:.08em}
+.box span{font:600 12.5px/1.3 var(--f-body)}
+.box small{display:block;font:500 11.5px/1.3 var(--f-data);opacity:.75}
+.box:hover{filter:brightness(1.06)}
+.box[aria-pressed=true]{background:repeating-linear-gradient(-45deg,var(--sodium) 0 14px,#f0a434 14px 28px);background-size:40px 40px;animation:stripes 1s linear infinite}
+@keyframes stripes{to{background-position:40px 0}}
+.opts{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px;color:var(--ink-2)}
+.opts label{display:flex;align-items:center;gap:6px;cursor:pointer}
+input[type=checkbox]{accent-color:var(--sodium);width:15px;height:15px}
+
+/* ---------- timing tower ---------- */
+.tt-wrap{overflow-x:auto}
+.tt{width:100%;border-collapse:collapse;font:500 12.5px/1 var(--f-data);font-variant-numeric:tabular-nums}
+.tt th{font:600 10px/1 var(--f-disp);letter-spacing:.14em;color:var(--mute);text-transform:uppercase;text-align:left;padding:9px 6px;border-bottom:1px solid var(--rule);white-space:nowrap}
+.tt td{padding:7px 6px;border-bottom:1px solid rgba(33,48,82,.55);white-space:nowrap}
+.tt .num{text-align:right}
+.tt th.num{text-align:right}
+.tt tr.me td{background:var(--sodium-soft)}
+.tt tr.me .c-t{color:var(--sodium);font-weight:600}
+.tt tr.dnf td{color:var(--mute)}
+.tt .c-p{font:700 15px/1 var(--f-disp);width:26px;text-align:center}
+.tt .c-t{font-family:var(--f-body);font-size:13px;max-width:170px;overflow:hidden;text-overflow:ellipsis}
+.c-ty{display:inline-flex;align-items:center;gap:5px}
+.tyl{color:var(--mute);font-size:11px}
+.st{font:600 10.5px/1 var(--f-disp);letter-spacing:.1em;padding:3px 6px;border-radius:3px;text-transform:uppercase}
+.st-pit{background:var(--ink);color:var(--night)}
+.st-bad{background:rgba(255,90,95,.15);color:var(--stop)}
+.st-dnf{color:var(--mute);box-shadow:inset 0 0 0 1px var(--rule-hi)}
+.st-fin{background:var(--ink);color:var(--night)}
+.st-spin{background:rgba(255,210,63,.13);color:var(--caution)}
+.tt-foot{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:9px 14px;font:500 11.5px var(--f-data);color:var(--mute)}
+.tt-foot b{color:var(--violet);font-weight:600}
+
+/* ---------- radar ---------- */
+.radar{padding:12px 14px;display:grid;gap:12px}
+.wx-now{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap}
+.wx-now b{font:700 22px/1 var(--f-disp);letter-spacing:.03em}
+.wx-temps{display:flex;gap:14px;font:500 12px var(--f-data);color:var(--ink-2)}
+.wx-temps b{font:600 15px var(--f-data);color:var(--ink)}
+.wet .g-bar i{background:var(--rain)}
+.fc{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.fc-col{display:grid;gap:4px;text-align:center}
+.fc-bar{position:relative;height:56px;background:var(--deck);border-radius:3px;overflow:hidden}
+.fc-bar i{position:absolute;left:0;right:0;bottom:0;background:var(--rain);transition:height .4s}
+.fc-p{font:600 12.5px/1 var(--f-data)}
+.fc-h{font:500 10.5px/1 var(--f-data);color:var(--mute)}
+.fc-note{font-size:11.5px;color:var(--mute);line-height:1.4}
+
+/* ---------- radio ---------- */
+.log{list-style:none;margin:0;padding:6px 0;max-height:300px;overflow-y:auto;font-size:13px}
+.log li{display:grid;grid-template-columns:42px minmax(0,1fr);gap:10px;padding:6px 14px;border-left:3px solid transparent}
+.log time{font:500 11.5px/1.5 var(--f-data);color:var(--mute)}
+.log li b{font:700 11px/1 var(--f-disp);letter-spacing:.1em;color:var(--ink-2);margin-right:6px;text-transform:uppercase}
+.log li.k-flag{border-left-color:var(--caution)}
+.log li.k-go{border-left-color:var(--go)}
+.log li.k-rain{border-left-color:var(--rain)}
+.log li.k-bad{border-left-color:var(--stop)}
+.log li.k-team{border-left-color:var(--sodium)}
+.log li.k-team b{color:var(--sodium)}
+
+/* ---------- toast ---------- */
+.toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);display:flex;align-items:center;gap:14px;width:max-content;max-width:calc(100% - 32px);background:var(--panel-hi);border:1px solid var(--sodium);padding:10px 10px 10px 16px;border-radius:10px;box-shadow:0 12px 34px rgba(0,0,0,.55);z-index:30;font-size:13.5px}
+.toast button{border:0;background:var(--sodium);color:var(--sodium-ink);font:700 13px/1 var(--f-body);padding:9px 14px;border-radius:6px;white-space:nowrap}
+
+/* ---------- overlays ---------- */
+.ov{position:fixed;inset:0;z-index:40;display:flex;overflow:auto;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));background:rgba(4,7,14,.8);backdrop-filter:blur(5px)}
+.sheet{margin:auto;width:min(1000px,100%);background:var(--panel);border:1px solid var(--rule-hi);border-radius:12px;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+.start{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr)}
+.start-hero{padding:30px 32px;border-right:1px solid var(--rule);background:radial-gradient(120% 80% at 0% 0%,rgba(255,181,71,.10),transparent 60%)}
+.hero-24{font:800 150px/.78 var(--f-disp);color:var(--sodium);letter-spacing:-.05em;display:flex;align-items:flex-end;gap:10px}
+.hero-24 span{font:700 18px/1 var(--f-disp);letter-spacing:.3em;color:var(--ink-2);padding-bottom:8px}
+.eyebrow{font:500 11px/1.4 var(--f-data);letter-spacing:.06em;color:var(--mute);text-transform:uppercase;margin:22px 0 6px}
+.start h1{font:800 44px/1 var(--f-disp);letter-spacing:.04em;margin:0 0 12px;text-wrap:balance}
+.lede{color:var(--ink-2);font-size:14.5px;line-height:1.65;margin:0 0 18px;max-width:46ch}
+.howto{margin:0;padding:0;list-style:none;display:grid;gap:9px;font-size:13px;color:var(--ink-2);line-height:1.55}
+.howto li{padding-left:14px;position:relative}
+.howto li::before{content:"";position:absolute;left:0;top:.62em;width:6px;height:2px;background:var(--sodium)}
+.howto b{color:var(--ink);font-weight:600}
+.start-form{padding:30px 28px;display:grid;gap:16px;align-content:start}
+.fld{display:grid;gap:7px}
+.fld>span{font:600 11px/1 var(--f-disp);letter-spacing:.16em;color:var(--mute);text-transform:uppercase}
+.fld input[type=text]{width:100%;background:var(--deck);border:1px solid var(--rule);border-radius:7px;padding:10px 12px;color:var(--ink);font:500 15px var(--f-body)}
+.fld .seg button{font-family:var(--f-body);font-size:13.5px;padding:9px 6px}
+.pickers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.pick{border:1px solid var(--rule);background:var(--deck);border-radius:7px;padding:9px 10px;text-align:left;display:grid;gap:3px}
+.pick b{font:700 14px/1 var(--f-data)}
+.pick span{font-size:11.5px;color:var(--mute);line-height:1.35}
+.pick[aria-pressed=true]{border-color:var(--sodium);background:var(--sodium-soft)}
+.pick[aria-pressed=true] b{color:var(--sodium)}
+.chk{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-2);cursor:pointer}
+.go{border:0;border-radius:8px;background:var(--go);color:#04140a;font:800 20px/1 var(--f-disp);letter-spacing:.1em;padding:16px;text-transform:uppercase;margin-top:4px}
+.go:hover{filter:brightness(1.08)}
+.best{margin:0;font:500 12px var(--f-data);color:var(--mute);text-align:center}
+@media (max-width:820px){.start{grid-template-columns:minmax(0,1fr)}.start-hero{border-right:0;border-bottom:1px solid var(--rule);padding:24px 20px}.start-form{padding:22px 20px}.hero-24{font-size:110px}}
+
+/* pit modal */
+.pit{width:min(940px,100%)}
+.pit-h{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:16px 20px;border-bottom:1px solid var(--rule)}
+.pit-h h2{margin:0;font:800 30px/1 var(--f-disp);letter-spacing:.06em}
+.pit-h h2 span{color:var(--sodium)}
+.pit-h small{display:block;font:500 11.5px/1.4 var(--f-data);color:var(--mute);margin-bottom:4px}
+.pit-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0}
+.pm{padding:16px 20px;border-bottom:1px solid var(--rule);display:grid;gap:10px;align-content:start;min-width:0}
+.pm:nth-child(odd){border-right:1px solid var(--rule)}
+.pm h3{margin:0;display:flex;justify-content:space-between;gap:8px;font:700 13px/1.2 var(--f-disp);letter-spacing:.16em;color:var(--ink-2);text-transform:uppercase}
+.pm h3 em{font:500 11.5px var(--f-data);letter-spacing:0;color:var(--mute);font-style:normal;text-transform:none}
+.pm input[type=range]{width:100%;accent-color:var(--sodium)}
+.pm-row{display:flex;flex-wrap:wrap;gap:6px}
+.chipbtn{border:1px solid var(--rule);background:var(--deck);border-radius:6px;padding:7px 10px;font:600 12.5px/1 var(--f-body);color:var(--ink-2)}
+.chipbtn:hover{border-color:var(--rule-hi);color:var(--ink)}
+.chipbtn[aria-pressed=true]{border-color:var(--sodium);color:var(--sodium);background:var(--sodium-soft)}
+.pm-info{margin:0;font:500 12px/1.5 var(--f-data);color:var(--ink-2)}
+.pm-info b{color:var(--ink)}
+.tyres{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.tyopt{border:1px solid var(--rule);background:var(--deck);border-radius:7px;padding:9px 6px;display:grid;justify-items:center;gap:5px;text-align:center;min-width:0}
+.tyopt .ty{width:26px;height:26px;font-size:12px;border-width:3.5px}
+.tyopt b{font:600 12px/1.1 var(--f-body)}
+.tyopt span{font:500 10.5px/1.3 var(--f-data);color:var(--mute)}
+.tyopt .rec{font:700 9.5px/1 var(--f-disp);letter-spacing:.12em;color:var(--go)}
+.tyopt[aria-pressed=true]{border-color:var(--sodium);background:var(--sodium-soft)}
+.tyopt:disabled{opacity:.35}
+.drvs{display:grid;gap:6px}
+.drvopt{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:4px 10px;align-items:center;border:1px solid var(--rule);background:var(--deck);border-radius:7px;padding:9px 11px;text-align:left}
+.drvopt b{font:700 14px/1 var(--f-data)}
+.drvopt .nm{font-size:12.5px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.drvopt .meta{grid-column:1/-1;font:500 11px/1.4 var(--f-data);color:var(--mute)}
+.drvopt[aria-pressed=true]{border-color:var(--sodium);background:var(--sodium-soft)}
+.drvopt[aria-pressed=true] b{color:var(--sodium)}
+.pit-f{padding:16px 20px;display:grid;gap:12px}
+.tbar{display:flex;height:22px;border-radius:4px;overflow:hidden;background:var(--deck)}
+.tbar i{display:block;height:100%;font:600 10px/22px var(--f-data);color:var(--caution-ink);padding-left:5px;white-space:nowrap;overflow:hidden}
+.tbar .s-lane{background:var(--rule-hi);color:var(--ink)}
+.tbar .s-fuel{background:var(--sodium)}
+.tbar .s-tyre{background:var(--ink)}
+.tbar .s-gar{background:var(--stop)}
+.tbar .s-pen{background:var(--violet)}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font:500 11px var(--f-data);color:var(--mute)}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.pit-sum{display:flex;flex-wrap:wrap;align-items:center;gap:14px 28px}
+.pit-sum small{display:block;font:600 10px/1.4 var(--f-disp);letter-spacing:.16em;color:var(--mute);text-transform:uppercase}
+.pit-sum .big{font:800 32px/1 var(--f-disp);font-variant-numeric:tabular-nums}
+.pit-sum .rj{font:500 12px/1.4 var(--f-data);color:var(--ink-2)}
+.release{margin-left:auto;border:0;border-radius:8px;background:var(--go);color:#04140a;font:800 20px/1 var(--f-disp);letter-spacing:.1em;padding:14px 22px;display:flex;align-items:center;gap:10px}
+.release kbd{background:rgba(0,0,0,.15);border-color:rgba(0,0,0,.25);color:#04140a}
+@media (max-width:760px){.pit-body{grid-template-columns:minmax(0,1fr)}.pm:nth-child(odd){border-right:0}.tyres{grid-template-columns:repeat(3,minmax(0,1fr))}.release{margin-left:0;width:100%;justify-content:center}}
+
+/* end screen */
+.end{width:min(980px,100%)}
+.end-h{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 26px;padding:26px 26px 18px;border-bottom:1px solid var(--rule)}
+.end-pos{font:800 110px/.78 var(--f-disp);color:var(--sodium);letter-spacing:-.04em}
+.end-h h2{margin:0 0 6px;font:800 30px/1.05 var(--f-disp);letter-spacing:.04em;text-wrap:balance}
+.end-h p{margin:0;color:var(--ink-2);font-size:13.5px;max-width:58ch}
+.end-body{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:0}
+.end-body>div{padding:18px 22px;min-width:0}
+.end-body>div:first-child{border-right:1px solid var(--rule)}
+.end-body h3{margin:0 0 10px;font:700 12px/1.2 var(--f-disp);letter-spacing:.16em;color:var(--ink-2);text-transform:uppercase}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.stats div{background:var(--deck);border-radius:6px;padding:9px 11px}
+.stats b{display:block;font:700 20px/1.1 var(--f-disp);font-variant-numeric:tabular-nums}
+.stats small{font:600 10px/1.3 var(--f-disp);letter-spacing:.12em;color:var(--mute);text-transform:uppercase}
+.chart svg{display:block;width:100%;height:auto}
+.chart .ax{font:500 9px var(--f-data);fill:var(--mute)}
+.chart .gl{stroke:var(--rule);stroke-width:1}
+.chart .ln{fill:none;stroke:var(--sodium);stroke-width:2;stroke-linejoin:round}
+.chart .night{fill:var(--deck)}
+.drv-sum{display:grid;gap:4px;font:500 12.5px var(--f-data);color:var(--ink-2);margin-top:14px}
+.drv-sum div{display:flex;justify-content:space-between;gap:10px}
+.drv-sum .bad{color:var(--stop)}
+.end-f{padding:16px 22px;border-top:1px solid var(--rule);display:flex;justify-content:flex-end}
+@media (max-width:760px){.end-body{grid-template-columns:minmax(0,1fr)}.end-body>div:first-child{border-right:0;border-bottom:1px solid var(--rule)}.end-pos{font-size:84px}}
+
+@media (max-width:760px){
+  .opt{display:none}
+  .clock-big{font-size:32px}
+  .pos{font-size:54px}
+  .crew-row,.crew-cap{grid-template-columns:40px minmax(0,1fr) 78px 52px;gap:8px}
+}
+@media (prefers-reduced-motion:reduce){
+  .mini,.mc-w.now,.mini-track.fl-miss,.mini-track.fl-late,.call,.call-tag::before,.stage canvas.flash,.pc-live::before,.ot,.ot::before,.burst,.burst-t,.pos.bump-up,.pos.bump-dn,.tt tr.fl-up td,.tt tr.fl-dn td{animation:none}
+  .car.limp,.car.boxing .ring,.box[aria-pressed=true]{animation:none}
+  .g-bar i,.fc-bar i,.trk-line{transition:none}
+}
+</style>
+
+<style>body{margin:0}</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="brand-mark">24h</div>
+      <div><div class="brand-name">維修站指揮官</div><div class="brand-sub">Circuit de la Sarthe · 13.626 km</div></div>
+    </div>
+    <div class="clock">
+      <div class="cell"><small>剩餘時間</small><div class="clock-big" id="cRemain">24:00:00</div></div>
+      <div class="cell"><small>當地時間</small><div class="clock-mid" id="cTod">週六 16:00</div></div>
+      <div class="cell"><small>已比賽</small><div class="clock-mid" id="cElapsed">0:00</div></div>
+    </div>
+    <div class="flag" id="flagChip" data-f="green">綠旗</div>
+    <div class="controls">
+      <div class="seg" role="group" aria-label="模擬速度" id="speedSeg">
+        <button type="button" id="btnPause" aria-pressed="false" title="暫停（空白鍵）">❚❚</button>
+        <button type="button" data-s="0" aria-pressed="false">1×</button>
+        <button type="button" data-s="1" aria-pressed="true">2×</button>
+        <button type="button" data-s="2" aria-pressed="false">4×</button>
+        <button type="button" data-s="3" aria-pressed="false">8×</button>
+      </div>
+      <button type="button" class="ghost" id="btnQuit">退出</button>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="你嘅賽車 3D 展示">
+    <canvas id="stageCv"></canvas>
+    <div class="stage-hud">
+      <div>
+        <div class="sh-eye" id="shEye">#88 · Hypercar</div>
+        <div class="sh-team" id="shTeam">Harbour Racing</div>
+        <div class="sh-info" id="shInfo"></div>
+      </div>
+      <span class="sh-hint" id="shHint">拖動旋轉</span>
+    </div>
+    <div class="pitcam" id="pitcam" hidden>
+      <span class="pc-live">PIT CAM</span>
+      <div class="pc-time"><b id="pcTimer">0.0s</b><span id="pcTotal"></span></div>
+      <ol class="pc-steps" id="pcSteps"></ol>
+      <button type="button" class="pc-skip" id="pcSkip">跳過慢鏡 ▸▸</button>
+    </div>
+    <div class="ot" id="ot" hidden><span class="ot-k" id="otK">OVERTAKE</span><b id="otBig">爬頭！</b><span class="ot-sub" id="otSub"></span></div>
+    <p class="stage-fallback" id="stageFallback" hidden>3D 模型載入唔到，遊戲照玩得。</p>
+  </section>
+
+  <div class="sky" aria-hidden="true">
+    <canvas id="sky"></canvas>
+    <div class="sky-labels"><span style="left:0">16:00</span><span style="left:16.667%">20:00</span><span style="left:33.333%">00:00</span><span style="left:50%">04:00</span><span style="left:66.667%">08:00</span><span style="left:83.333%">12:00</span><span style="left:100%">16:00</span></div>
+  </div>
+
+  <main class="grid">
+    <div class="col">
+    <section class="panel map a-map">
+      <div class="ph">賽道 <em id="mapInfo">13.626 km · 順時針</em></div>
+      <svg id="map" viewBox="0 0 400 600" role="img" aria-label="Circuit de la Sarthe 賽道圖，顯示各車位置" data-f="green">
+        <defs>
+          <pattern id="rainPat" width="7" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(18)">
+            <line x1="1" y1="0" x2="1" y2="5" stroke="#5aa9ff" stroke-width="1"></line>
+          </pattern>
+        </defs>
+        <rect class="map-bg" x="0" y="0" width="400" height="600"></rect>
+        <text class="lbl big" x="20" y="590">LA SARTHE</text>
+        <path class="trk-edge" id="trkEdge"></path>
+        <polyline class="slowz" id="slowZone" points="" style="display:none"></polyline>
+        <path class="trk-line" id="trkLine"></path>
+        <path class="pitlane" id="pitLane"></path>
+        <line class="sf" id="sfLine"></line>
+        <g id="labels"></g>
+        <rect class="night-ov" id="nightOv" x="0" y="0" width="400" height="600" opacity="0"></rect>
+        <g id="cars"></g>
+        <g id="fx"></g>
+        <rect class="rain-ov" id="rainOv" x="0" y="0" width="400" height="600" fill="url(#rainPat)" opacity="0"></rect>
+      </svg>
+    </section>
+
+    <section class="panel a-radar" aria-label="天氣雷達">
+      <div class="ph">天氣雷達 <em id="wxClock">—</em></div>
+      <div class="radar">
+        <div class="wx-now">
+          <div><span class="lbl-s">現在</span><b id="wxNow">晴</b></div>
+          <div class="wx-temps"><span>氣溫 <b id="wxAir">26°</b></span><span>賽道 <b id="wxTrack">40°</b></span></div>
+        </div>
+        <div class="wet">
+          <div class="g-top"><span class="g-lab">賽道濕度</span><span class="g-val" id="wxWetV">0%</span></div>
+          <div class="g-bar"><i id="wxWetB" style="width:0%"></i></div>
+          <div class="g-sub" id="wxWetS">乾地，用光頭胎</div>
+        </div>
+        <div>
+          <span class="lbl-s" style="margin-bottom:6px">降雨機率</span>
+          <div class="fc" id="fc"></div>
+        </div>
+        <p class="fc-note">預測時間越遠，誤差越大。濕度約 20% 以上，雨胎開始比光頭胎快。</p>
+      </div>
+    </section>
+    </div>
+    <div class="col">
+    <section class="panel con a-con" aria-label="你的賽車">
+      <div class="con-head">
+        <div class="pos" id="pPos">P–</div>
+        <div class="who">
+          <div class="who-team"><span class="numchip" id="pNum">88</span><span id="pTeam">Harbour Racing</span></div>
+          <div class="who-gaps" id="pGaps">—</div>
+        </div>
+        <div class="lapbox"><small>圈數</small><b id="pLap">0</b></div>
+      </div>
+      <div class="times">
+        <div><span class="lbl-s">上一圈</span><span id="tLast">—</span></div>
+        <div><span class="lbl-s">個人最快</span><span id="tBest">—</span></div>
+        <div><span class="lbl-s">全場最快</span><span id="tFast" class="purple">—</span></div>
+      </div>
+      <div class="status" id="pStatus"></div>
+      <div class="gauges">
+        <div>
+          <div class="g-top"><span class="g-lab">燃油</span><span class="g-val" id="gFuelV">100%</span></div>
+          <div class="g-bar ticks" id="gFuelBar"><i id="gFuelB" style="width:100%"></i></div>
+          <div class="g-sub" id="gFuelS">—</div>
+        </div>
+        <div>
+          <div class="g-top"><span class="g-lab">輪胎 <span class="ty ty-M" id="gTyreC">M</span></span><span class="g-val" id="gTyreV">0%</span></div>
+          <div class="g-bar"><i id="gTyreB" style="width:0%"></i></div>
+          <div class="g-sub" id="gTyreS">—</div>
+        </div>
+        <div>
+          <div class="g-top"><span class="g-lab">剎車</span><span class="g-val" id="gBrakeV">100%</span></div>
+          <div class="g-bar"><i id="gBrakeB" style="width:100%"></i></div>
+          <div class="g-sub" id="gBrakeS">碟片狀態良好</div>
+        </div>
+        <div>
+          <div class="g-top"><span class="g-lab">車身</span><span class="g-val" id="gBodyV">0%</span></div>
+          <div class="g-bar"><i id="gBodyB" style="width:0%"></i></div>
+          <div class="g-sub" id="gBodyS">無損傷</div>
+        </div>
+      </div>
+      <div class="alloc" id="alloc"></div>
+      <div>
+        <div class="crew-cap"><span>車手</span><span></span><span>總時間 / 6h</span><span>疲勞</span></div>
+        <div class="crew" id="crew"></div>
+      </div>
+      <div class="modes">
+        <span class="g-lab">引擎</span>
+        <div class="seg" role="group" aria-label="引擎模式" id="modeSeg">
+          <button type="button" data-mode="save" aria-pressed="false">省油</button>
+          <button type="button" data-mode="normal" aria-pressed="true">正常</button>
+          <button type="button" data-mode="push" aria-pressed="false">全力</button>
+        </div>
+      </div>
+      <button type="button" class="box" id="btnBox" aria-pressed="false">
+        <b>BOX</b>
+        <span id="boxTxt">呼叫入站<small id="boxSub">本圈尾進維修站</small></span>
+      </button>
+      <div class="opts">
+        <label><input type="checkbox" id="optGuard" checked> 低油量自動入站</label>
+        <label><input type="checkbox" id="optDialog" checked> 入站時打開設定</label>
+        <label><input type="checkbox" id="optAutoPause" checked> 事件自動暫停</label>
+        <label><input type="checkbox" id="optPitCam" checked> 入站慢鏡頭</label>
+        <label><input type="checkbox" id="optMini" checked> 換胎小遊戲</label>
+      </div>
+    </section>
+
+    <section class="panel a-radio" aria-label="無線電">
+      <div class="ph">無線電 <em>最新在上</em></div>
+      <ol class="log" id="log"></ol>
+    </section>
+    </div>
+    <div class="col">
+    <section class="panel a-tower" aria-label="計時塔">
+      <div class="ph">計時塔 <em id="towerInfo">Hypercar · 12 架</em></div>
+      <div class="tt-wrap">
+        <table class="tt">
+          <thead><tr><th>P</th><th>#</th><th>車隊</th><th class="num">圈</th><th class="num">差距</th><th class="num opt">間隔</th><th class="num opt">上圈</th><th>胎</th><th class="num opt">站</th><th>狀態</th></tr></thead>
+          <tbody id="ttBody"></tbody>
+        </table>
+      </div>
+      <div class="tt-foot"><span id="fastFoot">全場最快：—</span><span id="flagFoot">—</span></div>
+    </section>
+
+    <section class="panel a-guide" aria-label="車手同輪胎">
+      <div class="ph">車手 × 輪胎 <em>按而家賽道估算</em></div>
+      <div class="guide">
+        <div id="gTip"></div>
+        <div class="ct-wrap"><table class="ct" id="gComp"></table></div>
+        <div class="dcards" id="gDrv"></div>
+        <p class="g-foot">圈速＝而家條件下跑一節（滿油跑到冇油）嘅平均圈速，已計入車手疲勞同輪胎損耗。框住係嗰位車手最快嘅胎，★ 係嗰款胎最快嘅車手。</p>
+      </div>
+    </section>
+    </div>
+  </main>
+</div>
+
+<div class="mini" id="mini" hidden role="dialog" aria-labelledby="miniTitle">
+  <div class="mini-h">
+    <div><span class="call-tag">換胎小遊戲</span><b id="miniTitle">撳掣緊螺絲！</b></div>
+    <svg class="mini-car" viewBox="0 0 120 54" aria-hidden="true">
+      <path class="mc-body" d="M8 21 Q8 13 18 13 H90 Q108 18 114 27 Q108 36 90 41 H18 Q8 41 8 33 Z"></path>
+      <rect class="mc-cab" x="46" y="19" width="30" height="16" rx="7"></rect>
+      <rect class="mc-w" id="mw1" x="76" y="2" width="22" height="10" rx="2.5"></rect>
+      <rect class="mc-w" id="mw0" x="76" y="42" width="22" height="10" rx="2.5"></rect>
+      <rect class="mc-w" id="mw3" x="18" y="2" width="22" height="10" rx="2.5"></rect>
+      <rect class="mc-w" id="mw2" x="18" y="42" width="22" height="10" rx="2.5"></rect>
+    </svg>
+  </div>
+  <div class="mini-track" id="mTrack"><i class="mz-g" id="mZoneG"></i><i class="mz-p" id="mZoneP"></i><i class="mz-c" id="mCursor"></i></div>
+  <div class="mini-f"><span class="mini-g" id="miniGrade">右前輪 · 1 / 4</span><button type="button" class="mini-hit" id="miniHit">緊！<kbd>空白鍵</kbd></button></div>
+  <p class="mini-note">綠色係完美（每個輪 −1.4s），橙色係好（−0.4s），撳錯位 +2.5s，太遲 +3s。</p>
+</div>
+
+<div class="call" id="call" hidden role="dialog" aria-labelledby="callTitle">
+  <div class="call-h"><div><span class="call-tag" id="callTag">工程師</span><b id="callTitle"></b></div><span class="call-t" id="callTime">10</span></div>
+  <p id="callText"></p>
+  <div class="call-opts" id="callOpts"></div>
+  <div class="call-bar"><i id="callBar"></i></div>
+</div>
+
+<div class="toast" id="toast" hidden><span id="toastTxt">已暫停</span><button type="button" id="toastGo">繼續 ▶</button></div>
+
+<div class="ov" id="startOv">
+  <div class="sheet start">
+    <div class="start-hero">
+      <div class="hero-24">24<span>HOURS</span></div>
+      <p class="eyebrow">Circuit de la Sarthe · 13.626 km · 週六 16:00 起步</p>
+      <h1>維修站指揮官</h1>
+      <p class="lede">揀一隊 2026 年 Le Mans Hypercar 車隊，做佢哋嘅策略工程師。一架車、三位車手、廿四小時。油量、輪胎、天氣、安全車，每一次入站都由你拍板。</p>
+      <ul class="howto">
+        <li>按 <b>BOX</b> 後，賽車會在本圈尾入站，你再決定加幾多油、換咩胎、換邊位車手、要唔要修車。</li>
+        <li>入站損失約 34 秒。<b>安全車 / FCY</b> 期間全場減速，入站幾乎「免費」。</li>
+        <li>每位車手<b>連續駕駛不可超過 4 小時</b>，全場<b>最少 6 小時</b>、最多 14 小時，違規會罰時或罰圈。</li>
+        <li>日間賽道熱，中性胎耐用；夜晚賽道涼，軟胎可以跑兩節油。落雨時看準濕度轉雨胎。</li>
+        <li>入站時上面嘅 3D 車房會播 Pit Cam 慢鏡：千斤頂、換胎、入油、換車手，隨時可以跳過。</li>
+        <li>換胎時會有手速小遊戲：四個輪逐個睇準時機撳空白鍵（或者㩒「緊！」），撳得準停站快啲，撳錯慢啲。</li>
+        <li>比賽途中工程師會 call 你做決定：攻擊、防守、安全車、落雨、對手入站⋯⋯ 10 秒內揀，唔揀就用預設。</li>
+        <li>輪胎有配額：乾胎 14 套、雨胎 8 套，唔夠每節都換新胎，要計好幾時跑雙節。</li>
+        <li>快捷鍵：<kbd>空白</kbd> 暫停　<kbd>B</kbd> 入站　<kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> 引擎模式</li>
+      </ul>
+      <p class="disclaimer">非官方同人遊戲，同 ACO、FIA WEC 同各車廠、車隊冇關係。車隊名、車號參考 2026 年參賽陣容，塗裝顏色係近似色，冇用任何官方標誌；車手係虛構。各隊性能按 2026 年排位同正賽成績估算。</p>
+    </div>
+    <form class="start-form" id="startForm">
+      <div class="fld"><span>揀車隊 · 2026 Le Mans Hypercar 陣容（按正賽名次排）</span>
+        <div class="teams" id="teamList"></div>
+        <p class="team-note" id="teamNote"></p>
+      </div>
+      <label class="fld" id="customWrap" hidden><span>自訂車隊名稱</span><input type="text" id="optTeam" maxlength="22" value="Harbour Racing" autocomplete="off"></label>
+      <div class="fld"><span>難度</span>
+        <div class="seg" data-opt="diff">
+          <button type="button" data-val="easy" aria-pressed="false">輕鬆</button>
+          <button type="button" data-val="normal" aria-pressed="true">標準</button>
+          <button type="button" data-val="hard" aria-pressed="false">困難</button>
+        </div>
+      </div>
+      <div class="fld"><span>天氣</span>
+        <div class="seg" data-opt="weather">
+          <button type="button" data-val="dry" aria-pressed="false">大致乾地</button>
+          <button type="button" data-val="mixed" aria-pressed="true">陣雨多變</button>
+          <button type="button" data-val="wet" aria-pressed="false">雨戰</button>
+        </div>
+      </div>
+      <div class="fld"><span>起步車手</span>
+        <div class="pickers" data-opt="driver">
+          <button type="button" class="pick" data-val="0" aria-pressed="true"><b>MAR</b><span>白金 · 最快，但較食胎</span></button>
+          <button type="button" class="pick" data-val="1" aria-pressed="false"><b>WON</b><span>金 · 雨戰最強，好穩定</span></button>
+          <button type="button" class="pick" data-val="2" aria-pressed="false"><b>MOR</b><span>銀 · 慳胎耐力好，較慢</span></button>
+        </div>
+      </div>
+      <div class="fld"><span>起步輪胎（16:00 賽道約 40°C）</span>
+        <div class="seg" data-opt="tyre">
+          <button type="button" data-val="S" aria-pressed="false">軟胎 S</button>
+          <button type="button" data-val="M" aria-pressed="true">中性胎 M</button>
+          <button type="button" data-val="H" aria-pressed="false">硬胎 H</button>
+        </div>
+      </div>
+      <button type="submit" class="go">綠旗 · 開始比賽</button>
+      <p class="best" id="bestLine"></p>
+    </form>
+  </div>
+</div>
+
+<div class="ov" id="pitOv" hidden>
+  <div class="sheet pit" role="dialog" aria-modal="true" aria-labelledby="pitTitle">
+    <div class="pit-h">
+      <div><small id="pmSub">第 0 圈完成</small><h2 id="pitTitle">BOX BOX · <span>#88</span></h2></div>
+      <div class="flag" id="pmFlag" data-f="green">綠旗</div>
+    </div>
+    <div class="pit-body">
+      <section class="pm">
+        <h3>燃油 <em id="pmFuelNow"></em></h3>
+        <input type="range" id="pmFuel" min="0" max="100" step="1" value="0" aria-label="加油量">
+        <div class="pm-row">
+          <button type="button" class="chipbtn" data-fuel="full">加滿</button>
+          <button type="button" class="chipbtn" data-fuel="end" id="pmFuelEnd">夠跑到終點</button>
+          <button type="button" class="chipbtn" data-fuel="half">加 50%</button>
+          <button type="button" class="chipbtn" data-fuel="none">唔加</button>
+        </div>
+        <p class="pm-info" id="pmFuelInfo"></p>
+      </section>
+      <section class="pm">
+        <h3>輪胎 <em id="pmTyreNow"></em></h3>
+        <div class="tyres" id="pmTyres"></div>
+        <p class="pm-info" id="pmTyreInfo"></p>
+      </section>
+      <section class="pm">
+        <h3>車手 <em>連續上限 4h · 最少 6h</em></h3>
+        <div class="drvs" id="pmDrivers"></div>
+      </section>
+      <section class="pm">
+        <h3>維修 <em>車房工作與換胎同時進行</em></h3>
+        <label class="chk"><input type="checkbox" id="pmBrakes"> <span id="pmBrakesTxt">更換剎車碟</span></label>
+        <div id="pmRepairWrap">
+          <p class="pm-info" id="pmRepairInfo"></p>
+          <div class="pm-row" id="pmRepair">
+            <button type="button" class="chipbtn" data-rep="none">不修</button>
+            <button type="button" class="chipbtn" data-rep="quick">快修</button>
+            <button type="button" class="chipbtn" data-rep="full">全修</button>
+          </div>
+        </div>
+        <label class="chk" id="pmFixWrap"><input type="checkbox" id="pmFix"> <span id="pmFixTxt"></span></label>
+        <p class="pm-info" id="pmPen"></p>
+      </section>
+    </div>
+    <div class="pit-f">
+      <div class="tbar" id="pmBar"></div>
+      <div class="legend"><span><i style="background:var(--rule-hi)"></i>維修站通道</span><span><i style="background:var(--sodium)"></i>加油 / 換車手</span><span><i style="background:var(--ink)"></i>換胎</span><span><i style="background:var(--stop)"></i>車房</span><span><i style="background:var(--violet)"></i>罰時</span></div>
+      <div class="pit-sum">
+        <div><small>總損失時間</small><div class="big" id="pmTotal">0.0s</div></div>
+        <div><small>預計出站位置</small><div class="big" id="pmRejoin">P–</div><div class="rj" id="pmRejoinGap"></div></div>
+        <button type="button" class="release" id="pmGo">放車 <kbd>Enter</kbd></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="ov" id="endOv" hidden>
+  <div class="sheet end">
+    <div class="end-h">
+      <div class="end-pos" id="endPos">P1</div>
+      <div><h2 id="endTitle">方格旗</h2><p id="endLine"></p></div>
+    </div>
+    <div class="end-body">
+      <div>
+        <h3>最終成績</h3>
+        <div class="tt-wrap"><table class="tt"><thead><tr><th>P</th><th>#</th><th>車隊</th><th class="num">圈</th><th class="num">差距</th><th class="num">站</th></tr></thead><tbody id="endTable"></tbody></table></div>
+      </div>
+      <div>
+        <h3>你的比賽</h3>
+        <div class="stats" id="endStats"></div>
+        <h3>名次走勢</h3>
+        <div class="chart" id="endChart"></div>
+        <div class="drv-sum" id="endDrivers"></div>
+      </div>
+    </div>
+    <div class="end-f"><button type="button" class="go" id="btnAgain" style="padding:14px 26px">再來一場</button></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+/* ================= helpers ================= */
+const $=s=>document.querySelector(s);
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+const rnd=Math.random;
+const rr=(a,b)=>a+rnd()*(b-a);
+const pick=a=>a[Math.floor(rnd()*a.length)];
+function gauss(){let u=0,v=0;while(!u)u=rnd();while(!v)v=rnd();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+const pad=n=>String(n).padStart(2,'0');
+function fmtHMS(s){s=Math.max(0,Math.floor(s));return `${pad(Math.floor(s/3600))}:${pad(Math.floor(s%3600/60))}:${pad(s%60)}`;}
+function fmtHM(s){s=Math.max(0,Math.floor(s));return `${Math.floor(s/3600)}:${pad(Math.floor(s%3600/60))}`;}
+function fmtMS(s){s=Math.max(0,Math.round(s));return `${Math.floor(s/60)}:${pad(s%60)}`;}
+function fmtLap1(s){if(s==null||!isFinite(s)||s>=1e8)return '—';const m=Math.floor(s/60);return `${m}:${(s-m*60).toFixed(1).padStart(4,'0')}`;}
+function fmtLap(s){if(s==null||!isFinite(s)||s>=1e8)return '—';const m=Math.floor(s/60);return `${m}:${(s-m*60).toFixed(3).padStart(6,'0')}`;}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ================= rules & constants ================= */
+const RACE_LEN=86400, START_TOD=16*3600;
+const SPEEDS=[60,120,240,480];
+const PIT_LANE=34, PIT_LANE_SLOW=14, REFUEL_RATE=0.36, TYRE_TIME=28, DRIVER_TIME=22, BRAKE_TIME=170, MIN_STOP=6;
+const SC_LAP=352, FCY_LAP=520, SLOW_ADD=9;
+const LIMP={fuel:0.3,punct:0.42,damage:0.38,mech:0.4};
+const MAX_STINT=4*3600, MAX_TOTAL=14*3600, MIN_TOTAL=6*3600;
+const NONE=1e9;
+const TYRE_ALLOC={dry:14,wet:8};
+const setKey=k=>k==='W'?'wet':'dry';
+const SEV={green:0,slow:1,fcy:2,sc:3};
+const TYRES={
+  S:{name:'軟胎',wear:0.040,off:0,deg:5.5},
+  M:{name:'中性胎',wear:0.028,off:0.6,deg:5.0},
+  H:{name:'硬胎',wear:0.020,off:1.2,deg:4.5},
+  W:{name:'雨胎',wear:0.030,off:0,deg:5.0},
+};
+const MODES={
+  save:{name:'省油',fuel:0.0655,pace:0.9,tyre:0.88,brake:0.85,risk:0.75,mech:0.7},
+  normal:{name:'正常',fuel:0.073,pace:0,tyre:1,brake:1,risk:1,mech:1},
+  push:{name:'全力',fuel:0.082,pace:-0.8,tyre:1.18,brake:1.25,risk:1.6,mech:1.8},
+};
+const DRIVERS=[
+  {name:'Léo Marchand',tag:'MAR',grade:'白金',skill:0.985,rain:0.86,tyre:1.06,stamina:1.0,cons:0.95,note:'全隊最快，但較食胎，雨戰同穩定性一般。'},
+  {name:'黃子軒',tag:'WON',grade:'金',skill:0.945,rain:0.98,tyre:0.95,stamina:1.08,cons:1.08,note:'雨戰最強、最穩定，濕地交俾佢最安心。'},
+  {name:'森健太',tag:'MOR',grade:'銀',skill:0.885,rain:0.95,tyre:0.9,stamina:1.15,cons:1.0,note:'單圈最慢，但最慳胎、耐力最好；要揸夠 6 小時。'},
+];
+// 2026 Le Mans Hypercar field, listed in 2026 finishing order. pace = green-flag race pace (s/lap),
+// rel = failure-rate multiplier, crew = stop-time multiplier, rain = s/lap lost at full wet, q = 2026 Hyperpole slot.
+// liv = approximate livery: body, monocoque/sidepods, accent. dot = bright colour for the map and timing tower.
+const TEAMS=[
+  {num:'7',team:'Toyota Racing',mk:'Toyota',ab:'TOY',car:'TR010 Hybrid',pace:206.9,rel:0.8,crew:0.96,rain:0.8,q:14,res:'2026 冠軍',liv:['#eef1f4','#16181d','#e2231a'],dot:'#ff4b3e'},
+  {num:'20',team:'BMW M Team WRT',mk:'BMW',ab:'BMW',car:'M Hybrid V8',pace:207.0,rel:1.0,crew:0.98,rain:1.0,q:4,res:'2026 第 2',liv:['#16325c','#0e1626','#7ec8f0'],dot:'#4f8cff'},
+  {num:'8',team:'Toyota Racing',mk:'Toyota',ab:'TOY',car:'TR010 Hybrid',pace:207.0,rel:0.8,crew:0.96,rain:0.9,q:15,res:'2026 第 3',liv:['#16181d','#eef1f4','#e2231a'],dot:'#f2f4f7'},
+  {num:'12',team:'Cadillac Hertz Team Jota',mk:'Cadillac',ab:'CAD',car:'V-Series.R',pace:207.1,rel:1.05,crew:0.98,rain:1.0,q:2,res:'2026 第 4',liv:['#ffcc00','#121212','#ffcc00'],dot:'#ffcc00'},
+  {num:'51',team:'Ferrari AF Corse',mk:'Ferrari',ab:'FER',car:'499P',pace:207.1,rel:0.95,crew:0.95,rain:0.9,q:8,res:'2026 第 5 · 2023 冠軍',liv:['#d40000','#141414','#ffd200'],dot:'#ff5050'},
+  {num:'35',team:'Alpine Endurance Team',mk:'Alpine',ab:'ALP',car:'A424',pace:207.3,rel:0.95,crew:1.0,rain:1.0,q:3,res:'2026 第 6',liv:['#1e5bd8','#0b1630','#ffffff'],dot:'#3d7bff'},
+  {num:'83',team:'AF Corse',mk:'Ferrari',ab:'FER',car:'499P',pace:207.3,rel:1.0,crew:1.0,rain:1.1,q:17,res:'2026 第 7 · 2025 冠軍',liv:['#ffd200','#141414','#ffd200'],dot:'#ffd84a'},
+  {num:'007',team:'Aston Martin THOR Team',mk:'Aston Martin',ab:'AMR',car:'Valkyrie',pace:207.65,rel:1.05,crew:1.02,rain:1.0,q:11,res:'2026 第 8',liv:['#00594f','#0d1512','#c4ff2e'],dot:'#2fd08f'},
+  {num:'101',team:'Cadillac WTR',mk:'Cadillac',ab:'CAD',car:'V-Series.R',pace:207.45,rel:1.0,crew:1.0,rain:1.1,q:5,res:'2026 第 9',liv:['#1f4fa3','#f2f4f7','#1f4fa3'],dot:'#6b9bff'},
+  {num:'36',team:'Alpine Endurance Team',mk:'Alpine',ab:'ALP',car:'A424',pace:207.5,rel:1.0,crew:1.0,rain:1.0,q:13,res:'2026 第 10',liv:['#0b1630','#1e5bd8','#ffffff'],dot:'#8fb0ff'},
+  {num:'94',team:'Peugeot TotalEnergies',mk:'Peugeot',ab:'PEU',car:'9X8',pace:207.8,rel:1.0,crew:1.0,rain:1.0,q:18,res:'2026 第 11',liv:['#1b1f24','#2b313a','#c6ff00'],dot:'#c6ff00'},
+  {num:'93',team:'Peugeot TotalEnergies',mk:'Peugeot',ab:'PEU',car:'9X8',pace:207.85,rel:1.05,crew:1.0,rain:1.0,q:16,res:'2026 第 12',liv:['#2b313a','#1b1f24','#c6ff00'],dot:'#9fd400'},
+  {num:'19',team:'Genesis Magma Racing',mk:'Genesis',ab:'GEN',car:'GMR-001',pace:207.85,rel:1.3,crew:1.04,rain:1.2,q:6,res:'2026 第 13 · 新車隊',liv:['#20263a','#0c0f18','#d9a06b'],dot:'#d9a06b'},
+  {num:'009',team:'Aston Martin THOR Team',mk:'Aston Martin',ab:'AMR',car:'Valkyrie',pace:207.85,rel:1.25,crew:1.02,rain:1.1,q:7,res:'2026 第 14',liv:['#0d1512','#00594f','#c4ff2e'],dot:'#7ee8b4'},
+  {num:'50',team:'Ferrari AF Corse',mk:'Ferrari',ab:'FER',car:'499P',pace:207.12,rel:1.2,crew:0.95,rain:0.9,q:12,res:'2026 退出 · 2024 冠軍',liv:['#d40000','#ffd200','#141414'],dot:'#ff7a7a'},
+  {num:'15',team:'BMW M Team WRT',mk:'BMW',ab:'BMW',car:'M Hybrid V8',pace:207.05,rel:1.2,crew:0.98,rain:1.0,q:1,res:'2026 排位頭位 · 退出',liv:['#f2f4f7','#1c69d4','#ffffff'],dot:'#9fd8f5'},
+  {num:'17',team:'Genesis Magma Racing',mk:'Genesis',ab:'GEN',car:'GMR-001',pace:208.0,rel:1.5,crew:1.04,rain:1.2,q:9,res:'2026 退出 · 新車隊',liv:['#0c0f18','#20263a','#d9a06b'],dot:'#b9825a'},
+  {num:'38',team:'Cadillac Hertz Team Jota',mk:'Cadillac',ab:'CAD',car:'V-Series.R',pace:207.25,rel:1.25,crew:0.98,rain:1.0,q:10,res:'2026 退出',liv:['#121212','#ffcc00','#121212'],dot:'#e0b400'},
+];
+const CUSTOM_TEAM={num:'88',team:'Harbour Racing',mk:'自訂',ab:'HBR',car:'Hypercar',pace:207.35,rel:1.0,crew:1.0,rain:1.0,q:9.5,res:'虛構車隊',liv:['#ffb547','#17223f','#ffb547'],dot:'#ffb547',custom:true};
+const TEAM_OPTS=TEAMS.concat([CUSTOM_TEAM]);
+const DIFF_PACE={easy:-0.7,normal:-0.15,hard:0.35};
+// real BoP keeps the field within about a second; stretch it so each team's strength shows over 24 hours
+const racePace=t=>207.3+(t.pace-207.3)*1.6;
+function inkOn(hex){const n=parseInt(hex.slice(1),16),r=n>>16,g=n>>8&255,b=n&255;return 0.299*r+0.587*g+0.114*b>150?'#0b0f19':'#f4f6fa';}
+const teamChip=t=>{const L=t.liv;return `--a:${L[0]};--b:${L[1]};--c:${L[2]};--t:${inkOn(L[0])}`;};
+const ZONES=[
+  {name:'Dunlop',x:192,y:63},{name:'Tertre Rouge',x:293,y:88},{name:'Hunaudières',x:318,y:185},
+  {name:'Mulsanne',x:371,y:550},{name:'Indianapolis',x:224,y:472},{name:'Arnage',x:197,y:452},
+  {name:'Porsche Curves',x:174,y:296},{name:'Ford',x:118,y:182},
+];
+
+/* ================= track geometry ================= */
+const TRACK=(()=>{
+  const P=[[100,150],[112,128],[126,104],[140,84],[154,68],[170,60],[186,60],[196,67],[204,61],[214,64],[230,72],[244,76],[254,70],[266,78],[278,74],[290,82],[296,96],[302,120],[312,160],[322,200],[327,213],[334,218],[333,229],[340,260],[350,300],[356,328],[363,333],[362,344],[368,380],[372,420],[374,460],[378,500],[376,530],[370,552],[358,557],[340,546],[300,520],[262,494],[240,478],[226,472],[214,476],[204,470],[196,456],[198,440],[196,400],[190,360],[184,330],[172,312],[178,294],[164,276],[168,258],[152,240],[140,222],[132,200],[120,188],[126,178],[112,170],[106,160]];
+  const n=P.length;
+  const bez=(a,b,c,d,t)=>{const u=1-t;return [u*u*u*a[0]+3*u*u*t*b[0]+3*u*t*t*c[0]+t*t*t*d[0],u*u*u*a[1]+3*u*u*t*b[1]+3*u*t*t*c[1]+t*t*t*d[1]];};
+  let d=`M${P[0][0]} ${P[0][1]}`;const dense=[];
+  for(let i=0;i<n;i++){
+    const p0=P[(i-1+n)%n],p1=P[i],p2=P[(i+1)%n],p3=P[(i+2)%n];
+    const c1=[p1[0]+(p2[0]-p0[0])/6,p1[1]+(p2[1]-p0[1])/6];
+    const c2=[p2[0]-(p3[0]-p1[0])/6,p2[1]-(p3[1]-p1[1])/6];
+    d+=` C${c1[0].toFixed(2)} ${c1[1].toFixed(2)} ${c2[0].toFixed(2)} ${c2[1].toFixed(2)} ${p2[0]} ${p2[1]}`;
+    for(let k=0;k<20;k++)dense.push(bez(p1,c1,c2,p2,k/20));
+  }
+  d+='Z';
+  dense.push(dense[0].slice());
+  const cum=[0];
+  for(let i=1;i<dense.length;i++)cum.push(cum[i-1]+Math.hypot(dense[i][0]-dense[i-1][0],dense[i][1]-dense[i-1][1]));
+  const total=cum[cum.length-1];
+  const N=1200,pts=[];let j=0;
+  for(let k=0;k<N;k++){
+    const s=k/N*total;
+    while(cum[j+1]<s)j++;
+    const u=(s-cum[j])/((cum[j+1]-cum[j])||1);
+    pts.push([dense[j][0]+(dense[j+1][0]-dense[j][0])*u,dense[j][1]+(dense[j+1][1]-dense[j][1])*u]);
+  }
+  const ds=total/N;
+  const head=pts.map((p,i)=>{const q=pts[(i+1)%N];return Math.atan2(q[1]-p[1],q[0]-p[0]);});
+  let kap=head.map((h,i)=>{let a=head[(i+1)%N]-h;while(a>Math.PI)a-=2*Math.PI;while(a<-Math.PI)a+=2*Math.PI;return Math.abs(a)/ds;});
+  const sm=(arr,w)=>arr.map((_,i)=>{let s=0;for(let k=-w;k<=w;k++)s+=arr[(i+k+N)%N];return s/(2*w+1);});
+  kap=sm(kap,5);
+  // speed from curvature, then acceleration / braking limits so corners have braking zones
+  const v=kap.map(k=>Math.max(0.16,1/(1+60*k)));
+  const ACC=0.0065*ds,DEC=0.04*ds;
+  for(let pass=0;pass<2;pass++){
+    for(let i=0;i<N;i++){const a=(i+N-1)%N;v[i]=Math.min(v[i],v[a]+ACC);}
+    for(let i=N-1;i>=0;i--){const b=(i+1)%N;v[i]=Math.min(v[i],v[b]+DEC);}
+  }
+  const tf=[0];for(let i=1;i<N;i++)tf.push(tf[i-1]+ds/v[i-1]);
+  const T=tf[N-1]+ds/v[N-1];for(let i=0;i<N;i++)tf[i]/=T;
+  function at(p){
+    p=((p%1)+1)%1;let lo=0,hi=N-1;
+    while(lo<hi){const m=(lo+hi+1)>>1;if(tf[m]<=p)lo=m;else hi=m-1;}
+    const i=lo,k=(i+1)%N,t1=k?tf[k]:1,u=t1>tf[i]?(p-tf[i])/(t1-tf[i]):0;
+    return [pts[i][0]+(pts[k][0]-pts[i][0])*u,pts[i][1]+(pts[k][1]-pts[i][1])*u];
+  }
+  function nearest(x,y){let b=0,bd=1e9;pts.forEach((p,i)=>{const q=(p[0]-x)**2+(p[1]-y)**2;if(q<bd){bd=q;b=i;}});return b;}
+  function offset(i,o){const j=((Math.round(i)%N)+N)%N,h=head[j],p=pts[j];return [p[0]-Math.sin(h)*o,p[1]+Math.cos(h)*o];}
+  return {d,pts,N,at,nearest,offset};
+})();
+ZONES.forEach(z=>{z.idx=TRACK.nearest(z.x,z.y);});
+const PIT_SLOTS=[];for(let k=0;k<24;k++)PIT_SLOTS.push(TRACK.offset(-26+k*4.6,10));
+
+/* ================= state ================= */
+let G=null;
+const me=()=>G.cars[G.meIdx];
+const START={diff:'normal',weather:'mixed',driver:0,tyre:'M',team:TEAMS.findIndex(t=>t.num==='51')};
+function pickedTeam(){
+  const t=TEAM_OPTS[START.team]||TEAMS[0];
+  if(!t.custom)return t;
+  const el=document.getElementById('optTeam');
+  return Object.assign({},t,{team:((el&&el.value)||'').trim().slice(0,22)||'Harbour Racing'});
+}
+
+/* ================= weather & environment ================= */
+function genShowers(preset){
+  const cfg={dry:{n:[0,1],dur:[900,2400],pk:[0.2,0.45]},mixed:{n:[2,3],dur:[1200,4800],pk:[0.3,0.9]},wet:{n:[4,5],dur:[2400,7200],pk:[0.5,1]}}[preset];
+  const n=cfg.n[0]+Math.floor(rnd()*(cfg.n[1]-cfg.n[0]+1));
+  const out=[];
+  for(let i=0;i<n;i++){const dur=rr(...cfg.dur);const start=2400+rnd()*(RACE_LEN-2400-dur);out.push({start,end:start+dur,peak:rr(...cfg.pk),seed:rnd()*10});}
+  return out;
+}
+function rainAt(t){
+  let r=0;
+  for(const s of G.wx.showers){
+    if(t<s.start||t>s.end+600)continue;
+    const k=t<s.start+480?(t-s.start)/480:t<s.end?1:1-(t-s.end)/600;
+    r=Math.max(r,s.peak*k*(0.85+0.15*Math.sin(t/377+s.seed)));
+  }
+  return clamp(r,0,1);
+}
+function lightAt(tod){
+  if(tod>=22.5||tod<5)return 0;
+  if(tod>=21.6)return 1-(tod-21.6)/0.9;
+  if(tod<5.9)return (tod-5)/0.9;
+  return 1;
+}
+function computeEnv(t){
+  const tod=(((START_TOD+t)%86400)+86400)%86400/3600;
+  const light=lightAt(tod);
+  const sun=Math.max(0,Math.sin(Math.PI*(tod-5.75)/16));
+  const rain=G.wx.rain,wet=G.wx.wet;
+  const air=19+7*Math.cos(2*Math.PI*(tod-15.5)/24)-rain*4;
+  const track=air+14*sun*(1-0.85*Math.min(1,rain*2))-8*wet;
+  return {tod,light,sun,air,track,rain,wet};
+}
+const FC_H=[10,20,30,45,60];
+function forecast(){
+  return FC_H.map((h,i)=>{
+    const tt=G.t+h*60,win=h*60*0.3;
+    let m=0;for(let k=-2;k<=2;k++)m=Math.max(m,rainAt(tt+k*win/2));
+    let p=m>0.04?0.55+0.45*Math.min(1,m*1.6):0.05;
+    p+=G.fc.bias[i]*(0.08+0.45*h/60);
+    return {h,p:clamp(p,0.02,0.97),inten:clamp(m+G.fc.bias[i]*0.2*h/60,0,1)};
+  });
+}
+function updateWx(dt){
+  const w=G.wx,r=rainAt(G.t),sun=G.env.sun;
+  if(r>w.wet)w.wet+=(r-w.wet)*Math.min(1,dt/420);
+  else w.wet=Math.max(r,w.wet-dt/(2400-1300*sun));
+  if(r>0.05&&w.rain<=0.05){const p=G.cars.length&&me();const q=p&&p.tyre.c!=='W'&&p.sets.wet>0&&queueCall('rain');radio('天氣',r>0.4?'開始落雨，雨勢唔細！留意賽道濕度。':'開始落雨喇。','rain',!q);}
+  if(r<=0.03&&w.rain>0.03)radio('天氣','雨停咗，賽道會慢慢乾返。','rain');
+  w.rain=r;
+  if(G.t>=G.fc.next){G.fc.next=G.t+360;G.fc.bias=G.fc.bias.map(b=>clamp(b*0.6+gauss()*0.45,-1,1));}
+  const f=forecast();
+  if(!G.fc.warned&&w.rain<0.05&&f[1].p>0.6){G.fc.warned=true;radio('工程師',`雷達：大約 20 分鐘內有機會落雨（${Math.round(f[1].p*100)}%）。`,'rain');}
+  if(G.fc.warned&&w.rain<0.03&&f[1].p<0.3&&f[0].p<0.3)G.fc.warned=false;
+}
+
+/* ================= flags ================= */
+function randCause(){
+  const z=pick(ZONES);
+  return {zone:z.name,text:`${pick(['一架 LMGT3','一架 LMP2','一架 LMGT3'])}喺 ${z.name} ${pick(['撞欄','停咗喺路邊','衝出砂地','留低大量碎片','引擎冒煙停車'])}`};
+}
+function closeFlag(){const h=G.flagHist[G.flagHist.length-1];if(h&&h.to==null)h.to=G.t;}
+function raiseFlag(type,cause,zone){
+  if(G.chequer||SEV[type]<=SEV[G.flag.type])return;
+  const dur=type==='sc'?rr(1200,2700):type==='fcy'?rr(180,480):rr(300,900);
+  if(G.flag.type!=='green')closeFlag();
+  const zi=Math.max(0,ZONES.findIndex(z=>z.name===zone));
+  G.flag={type,until:G.t+dur,since:G.t,cause,zone:zi};
+  G.flagHist.push({type,from:G.t,to:null});
+  const pc=G.cars.length&&me();
+  const q=pc&&(type==='sc'||(type==='fcy'&&(pc.fuel<0.6||pc.tyre.wear>0.5)))&&queueCall('sc',{fcy:type==='fcy'});
+  if(type==='sc')radio('賽事',`安全車出動：${cause}。而家入站損失細好多！`,'flag',!q);
+  else if(type==='fcy')radio('賽事',`全場黃旗 FCY：${cause}。全場限速 80 km/h。`,'flag',!q);
+  else radio('賽事',`${ZONES[zi].name} 慢速區：${cause}。`,'flag');
+}
+function updateFlag(dt){
+  const f=G.flag;
+  if(f.type!=='green'){
+    if(G.t>=f.until){
+      closeFlag();
+      if(f.type==='fcy'&&rnd()<0.3&&!G.chequer){
+        G.flag={type:'sc',until:G.t+rr(1200,2400),since:G.t,cause:f.cause,zone:f.zone};
+        G.flagHist.push({type:'sc',from:G.t,to:null});
+        radio('賽事','現場清理需時，FCY 轉為安全車。','flag',true);
+      }else{
+        G.flag={type:'green',until:0,since:G.t,cause:'',zone:0};
+        radio('賽事',f.type==='slow'?`${ZONES[f.zone].name} 慢速區解除。`:'綠旗！比賽恢復。','go');
+      }
+    }
+    return;
+  }
+  if(G.chequer)return;
+  const per=dt/3600*(1+2*G.wx.rain);
+  if(rnd()<0.1*per){const c=randCause();raiseFlag('sc',c.text,c.zone);}
+  else if(rnd()<0.28*per){const c=randCause();raiseFlag('fcy',c.text,c.zone);}
+  else if(rnd()<0.8*per){const c=randCause();raiseFlag('slow',c.text,c.zone);}
+}
+
+/* ================= car model ================= */
+function fuelPerLap(c){return MODES[c.mode].fuel*(c.isPlayer?1:c.ai.fuel)*(1-0.12*G.env.wet);}
+function brakePerLap(c){return 0.0032*MODES[c.mode].brake*(1-0.3*G.env.wet);}
+function tyreDelta(ty,e){
+  const T=TYRES[ty.c],w=ty.wear;
+  let x=T.off+T.deg*Math.pow(Math.min(w,1.2),1.6);
+  if(w>0.85)x+=(w-0.85)*60;
+  if(ty.c==='W')x+=e.wet*17+(1-e.wet)*7;
+  else{
+    x+=e.wet*46+Math.max(0,e.wet-0.3)*40;
+    if(ty.c==='H')x+=Math.max(0,24-e.track)*0.09;
+    if(ty.c==='S')x+=Math.max(0,e.track-34)*0.12;
+    if(ty.c==='M')x+=Math.max(0,18-e.track)*0.05;
+  }
+  return x;
+}
+function wearPerLap(c,comp,e,d){
+  const T=TYRES[comp];let r=T.wear;
+  if(comp==='W')r*=0.8+3.5*Math.pow(1-e.wet,1.5);
+  else r*=(0.7+clamp((e.track-15)/25,0,1.3)*0.6)*(1-0.5*e.wet);
+  r*=MODES[c.mode].tyre*(d?d.tyre:c.isPlayer?c.drivers[c.di].tyre:c.ai.tyre);
+  return r;
+}
+// expected green-flag lap for the player's car with driver d on a given tyre, wear and fuel load
+function estLap(c,d,comp,wear,fuel){
+  const e=G.env;
+  let lt=c.pace+(1-d.skill)*7+3.2*d.fatigue*d.fatigue+e.wet*(1-d.rain)*10;
+  lt+=fuel*2.5+tyreDelta({c:comp,wear},e)+MODES[c.mode].pace+(e.track-25)*0.045+(1-e.light)*0.5;
+  if(c.brakes<0.35)lt+=(0.35-c.brakes)*14;
+  return lt+c.damage*12+(c.issue?c.issue.pace:0);
+}
+function greenLap(c){
+  if(c.isPlayer)return estLap(c,c.drivers[c.di],c.tyre.c,c.tyre.wear,c.fuel)+c.noise+modPace(c);
+  const e=G.env;let lt=c.pace+c.drvOff+e.wet*c.ai.rainOff;
+  lt+=c.fuel*2.5+tyreDelta(c.tyre,e)+MODES[c.mode].pace+(e.track-25)*0.045+(1-e.light)*0.5;
+  if(c.brakes<0.35)lt+=(0.35-c.brakes)*14;
+  lt+=c.damage*12+(c.issue?c.issue.pace:0)+c.noise;
+  return lt;
+}
+// short-lived lap-time modifiers from engineer calls (traffic, morale)
+function modPace(c){let s=0;if(c.mods)for(const m of c.mods)if(m.until>G.t)s+=m.pace;return s;}
+function addMod(c,pace,secs){(c.mods||(c.mods=[])).push({pace,until:G.t+secs});}
+function tempMode(c,mode,laps){
+  c.tmode={prev:c.tmode?c.tmode.prev:c.mode,until:G.t+laps*c.curLT};c.mode=mode;
+  radio('工程師',`引擎轉${MODES[mode].name}模式，${laps} 圈後轉返。`,'team');
+}
+function curLap(c){
+  let lt=greenLap(c);const f=G.flag.type;
+  if(f==='sc')lt=Math.max(lt,SC_LAP);
+  else if(f==='fcy')lt=Math.max(lt,FCY_LAP);
+  else if(f==='slow')lt+=SLOW_ADD;
+  return lt;
+}
+function lapRef(c){return G.flag.type==='sc'?SC_LAP:G.flag.type==='fcy'?FCY_LAP:(c.refLT||210);}
+function lapNoise(){let n=gauss()*0.45;if(rnd()<0.14)n+=0.8+rnd()*3.2;return n;}
+const dist=c=>c.lap+c.prog;
+
+function mkCar(o){
+  return Object.assign({prog:0,lap:0,lapStart:0,lastLap:null,best:NONE,refLT:210,curLT:210,noise:0,clean:false,
+    fuel:1,tyre:{c:'M',wear:0,laps:0},brakes:1,damage:0,issue:null,punct:false,mode:'normal',state:'run',limpWhy:null,
+    delay:0,pitTimer:0,pitTotal:0,hold:false,stops:0,pitTime:0,penalty:0,penLaps:0,finishT:null,dnfWhy:'',incidents:0,
+    boxCall:false,drvOff:0,mods:[],sets:{dry:TYRE_ALLOC.dry-1,wet:TYRE_ALLOC.wet},hint:null},o);
+}
+
+/* ---------- incidents ---------- */
+function rollIncidents(c,dp,riskF){
+  const e=G.env;
+  let p=0.0018*MODES[c.mode].risk*(1+0.6*(1-e.light))*(1+1.2*e.wet);
+  if(c.isPlayer){const d=c.drivers[c.di];p*=(1+4*d.fatigue*d.fatigue)*(1+e.wet*(1-d.rain)*5)/d.cons;}
+  else p*=c.ai.risk;
+  if(c.tyre.c!=='W'&&e.wet>0.12)p*=1+30*(e.wet-0.12);
+  if(c.tyre.c==='W'&&e.wet<0.1)p*=1.5;
+  if(c.tyre.wear>0.85)p*=2;
+  if(c.brakes<0.2)p*=2.5;
+  if(rnd()<p*riskF*dp){incident(c);return;}
+  if(rnd()<(0.0006+Math.max(0,c.tyre.wear-0.9)*1.2)*dp){puncture(c);return;}
+  if(!(c.mechSafe>G.t)&&rnd()<0.00045*MODES[c.mode].mech*(c.isPlayer?(c.rel||1):c.ai.rel)*dp){mechanical(c);return;}
+  if(c.brakes<0.1&&rnd()<0.04*dp)heavyCrash(c,pick(ZONES).name,'剎車失靈');
+}
+const who=c=>c.isPlayer?c.drivers[c.di].tag:`#${c.num}`;
+function incident(c){
+  c.incidents++;c.clean=false;
+  const r=rnd(),where=pick(ZONES).name;
+  if(r<0.55){
+    const lost=rr(8,20);c.delay+=lost;
+    if(c.isPlayer)radio(who(c),`Sorry！喺 ${where} 打咗個轉，蝕咗大約 ${Math.round(lost)} 秒。`,'bad',true);
+  }else if(r<0.88){
+    const lost=rr(12,30);c.delay+=lost;c.damage=Math.min(1,c.damage+rr(0.12,0.37));
+    if(c.isPlayer)radio(who(c),`喺 ${where} 衝出咗砂地，車頭有損傷（${Math.round(c.damage*100)}%）。`,'bad',true);
+    if(c.damage>0.55){goLimp(c,'damage');if(c.isPlayer)radio('工程師','損傷太大，慢慢揸返入維修站。','bad');}
+  }else heavyCrash(c,where,'');
+}
+function heavyCrash(c,where,why){
+  c.incidents++;c.clean=false;
+  c.damage=Math.min(1,c.damage+rr(0.6,0.9));c.delay+=rr(25,55);
+  const r=rnd();raiseFlag(r<0.45?'sc':r<0.8?'fcy':'slow',`#${c.num} 喺 ${where} ${why||'重撞'}`,where);
+  if(rnd()<0.1){retire(c,why||'撞車');return;}
+  goLimp(c,'damage');
+  if(c.isPlayer)radio(who(c),`${why?why+'！':''}喺 ${where} 撞咗落防撞欄！車損好嚴重，慢慢拖返入站。`,'bad',true);
+  else radio('賽事',`#${c.num} ${c.team} 喺 ${where} 重撞，拖著傷車返維修站。`,'bad');
+}
+function puncture(c){
+  c.punct=true;c.delay+=3;goLimp(c,'punct');
+  if(c.isPlayer)radio(who(c),'爆胎！爆胎！慢慢拖返入站。','bad',true);
+}
+function mechanical(c){
+  const r=rnd();
+  if(r<0.55){
+    if(c.issue)return;
+    c.issue={pace:rr(1.2,3.5),fix:rr(40,90),major:false,label:pick(['混能系統過熱','感應器故障','車門鉸鏈鬆脫','空力件鬆脫','頭燈故障'])};
+    if(c.isPlayer)radio(who(c),`${c.issue.label}，每圈慢咗大約 ${c.issue.pace.toFixed(1)} 秒。入站可以修。`,'bad',true);
+  }else if(r<(c.isPlayer?0.97:0.88)){
+    c.issue={pace:6,fix:rr(300,780),major:true,label:pick(['變速箱故障','懸掛損壞','混能系統失效','漏油'])};
+    goLimp(c,'mech');
+    if(c.isPlayer)radio(who(c),`${c.issue.label}！部車好唔對路，要即刻返車房。`,'bad',true);
+    else radio('賽事',`#${c.num} ${c.team} 出現${c.issue.label}，慢駛返維修站。`,'bad');
+  }else retire(c,pick(['引擎故障','變速箱損壞','車尾起火']));
+}
+function goLimp(c,why){if(c.state!=='run')return;c.state='limp';c.limpWhy=why;c.clean=false;}
+function retire(c,why){
+  if(c.state==='dnf')return;
+  c.state='dnf';c.dnfWhy=why;c.boxCall=false;
+  radio('賽事',`#${c.num} ${c.team} 退出比賽（${why}）。`,'bad',c.isPlayer);
+  if(c.isPlayer)G.endSoon=true;
+}
+
+/* ---------- per-tick car update ---------- */
+function updateCar(c,dt){
+  if(c.state==='dnf'||c.state==='done')return;
+  if(c.state==='pit'){
+    if(c.hold)return;
+    // the player's tyre change waits for the timing mini-game
+    if(c.isPlayer&&c.svc&&!c.svc.miniDone&&G.opt.mini!==false){
+      let acc=0,ts=-1;for(const [n,d] of c.svc.phases){if(n==='tyre'){ts=acc;break;}acc+=d;}
+      if(ts<0)c.svc.miniDone=true;
+      else if(c.pitTotal-c.pitTimer+dt>=ts){c.pitTimer=c.pitTotal-ts;miniStart(c);return;}
+    }
+    c.pitTimer-=dt;
+    if(c.pitTimer<=0)exitPit(c);
+    return;
+  }
+  if(c.delay>0){c.delay-=dt;c.clean=false;return;}
+  const lt=curLap(c);
+  let sp=1/lt;
+  if(c.state==='limp')sp=Math.min(sp,LIMP[c.limpWhy]/(c.pace+4));
+  c.curLT=1/sp;
+  const dp=sp*dt;
+  const caution=G.flag.type==='sc'||G.flag.type==='fcy';
+  const cons=G.flag.type==='sc'?0.5:G.flag.type==='fcy'?0.4:G.flag.type==='slow'?0.95:1;
+  if(!(c.state==='limp'&&c.limpWhy==='fuel')){
+    c.fuel-=fuelPerLap(c)*dp*cons*(c.slipUntil>G.t?0.88:1);
+    if(c.fuel<=0){
+      c.fuel=0;
+      if(c.state==='run'){goLimp(c,'fuel');if(c.isPlayer)radio(who(c),'冇油喇！用電池慢慢爬返去維修站……','bad',true);}
+    }
+  }
+  c.tyre.wear=Math.min(1.2,c.tyre.wear+wearPerLap(c,c.tyre.c,G.env)*dp*cons);
+  c.brakes=Math.max(0,c.brakes-brakePerLap(c)*dp*cons);
+  if(G.flag.type!=='green')c.clean=false;
+  if(c.state==='run')rollIncidents(c,dp,caution?0.15:1);
+  if(c.state==='dnf')return;
+  const prev=c.prog;c.prog+=dp;
+  if(c.prog>=1){
+    const tc=G.t-dt+dt*((1-prev)/dp);
+    c.prog-=1;
+    onLine(c,tc);
+  }
+}
+function isLeader(c){const d=dist(c);return G.cars.every(o=>o===c||o.state==='dnf'||dist(o)<=d);}
+function onLine(c,tc){
+  c.lap++;
+  const lt=tc-c.lapStart;c.lastLap=lt;c.lapStart=tc;
+  if(c.clean&&c.lap>1){
+    if(lt<c.best)c.best=lt;
+    if(lt<G.fastest.t)G.fastest={t:lt,num:c.num};
+    c.refLT=c.refLT*0.75+lt*0.25;
+  }
+  c.clean=true;c.noise=lapNoise();c.tyre.laps++;
+  if(c.mods&&c.mods.length)c.mods=c.mods.filter(m=>m.until>G.t);
+  if(G.chequer){
+    if(G.winnerIdx<0){if(isLeader(c)){G.winnerIdx=c.idx;finish(c,tc);radio('賽事',`方格旗！#${c.num} ${c.team} 贏得 24 小時耐力賽！`,'go');return;}}
+    else{finish(c,tc);return;}
+  }
+  if(c.isPlayer)playerOnLine(c,tc);
+  else if(aiWantsPit(c))enterPit(c,tc);
+}
+function finish(c,tc){
+  c.state='done';c.finishT=tc;c.prog=0;
+  if(c.isPlayer)radio('工程師',`方格旗！完成 ${c.lap} 圈，P${posOf(c)} 衝線！`,'go');
+}
+function playerOnLine(c,tc){
+  const fpl=fuelPerLap(c),lapsLeft=c.fuel/fpl;
+  const guard=G.opt.guard&&lapsLeft<1.03&&c.state==='run';
+  if(c.boxCall||c.state==='limp'||guard){
+    if(guard&&!c.boxCall)radio('工程師','油量唔夠跑多一圈，自動叫你入站。','team');
+    enterPit(c,tc);return;
+  }
+  if(c.quiet>0)c.quiet--;
+  G.lastPos=posOf(c);
+  if(lapsLeft<2.1&&!c.fuelWarned&&G.t<RACE_LEN){c.fuelWarned=true;radio('工程師',`燃油只夠大約 ${lapsLeft.toFixed(1)} 圈，準備入站。`,'team',!G.opt.guard);}
+  if(c.tyre.wear>0.82&&!c.tyre.warned){c.tyre.warned=true;radio(who(c),'對胎就嚟冇晒抓地力，好難揸！','team');}
+}
+
+/* ---------- pit stops ---------- */
+function enterPit(c,tc){
+  if(!c.isPlayer&&G.flag.type==='green'){
+    // the car right in front of the player just pitted: offer to react
+    const p=me(),oi=G.order.indexOf(p.idx);
+    if(G.order[oi-1]===c.idx&&p.state==='run'&&p.fuel<0.42&&!p.boxCall&&dist(c)-dist(p)<0.08)queueCall('undercut',{r:c.idx});
+  }
+  c.state='pit';c.prog=0;c.stops++;c.clean=false;c.boxCall=false;c.fuelWarned=false;c.delay=0;
+  if(c.isPlayer){c.hold=true;openPit(c);}
+  else startService(c,aiPlan(c));
+}
+function serviceTime(c,plan){
+  const slow=G.flag.type==='sc'||G.flag.type==='fcy';
+  const lane=slow?PIT_LANE_SLOW:PIT_LANE;
+  const fuelT=plan.fuel*100*REFUEL_RATE;
+  const swap=c.isPlayer?plan.driver!==c.di:!!plan.driverSwap;
+  const drvT=swap?DRIVER_TIME:0;
+  const base=Math.max(MIN_STOP,fuelT,drvT);
+  const brakeT=plan.brakes?BRAKE_TIME:0;
+  const repT=plan.repair==='quick'?35:plan.repair==='full'?Math.round(60+c.damage*420):0;
+  const fixT=(plan.fix&&c.issue?c.issue.fix:0)+(plan.check?30:0);
+  const garage=(brakeT||repT||fixT)?15+Math.max(brakeT,repT,fixT):0;
+  const tyreT=plan.tyre&&!plan.brakes?TYRE_TIME:0;
+  const crew=c.isPlayer?(c.crew||1):c.ai.crew;
+  const pen=c.penalty||0;
+  const stationary=(base+tyreT+garage)*crew+pen;
+  return {lane,fuelT,drvT,base:base*crew,tyreT:tyreT*crew,garage:garage*crew,pen,stationary,total:lane+stationary};
+}
+function startService(c,plan){
+  const s=serviceTime(c,plan);let extra=0;
+  if(plan.tyre&&rnd()<0.04){extra=rr(4,10);if(c.isPlayer)radio('維修站',`右後輪螺絲卡住咗！多咗 ${extra.toFixed(1)} 秒。`,'bad');}
+  c.pitTimer=s.total+extra;c.pitTotal=c.pitTimer;c.pitTime+=c.pitTimer;
+  if(c.isPlayer){
+    const tyreDur=s.tyreT>0?s.tyreT+extra:0,baseDur=s.base+(s.tyreT>0?0:extra);
+    c.svc={phases:[['in',s.lane/2],['pen',s.pen],['fuel',baseDur],['tyre',tyreDur],['garage',s.garage],['out',s.lane/2]].filter(p=>p[1]>0.01),
+      fuelFrom:c.fuel,fuelTo:Math.min(1,c.fuel+plan.fuel),oldTyre:c.tyre.c,newTyre:plan.tyre||(c.punct?c.tyre.c:null),
+      swap:plan.driver!==c.di?[c.drivers[c.di].tag,c.drivers[plan.driver].tag]:null,brakes:!!plan.brakes,repair:plan.repair||null,fix:!!(plan.fix&&c.issue),n:c.stops};
+    G.pitSkip=false;
+  }
+  c.fuel=Math.min(1,c.fuel+plan.fuel);
+  if(plan.tyre||c.punct){
+    const k=plan.tyre||c.tyre.c;
+    if(c.sets[setKey(k)]>0){c.sets[setKey(k)]--;c.tyre={c:k,wear:0,laps:0};}
+    else c.tyre={c:k,wear:0.45,laps:0};   // allocation used up: bolt on a scrubbed set
+  }
+  if(plan.check)c.mechSafe=G.t+3*3600;
+  c.punct=false;
+  if(plan.brakes)c.brakes=1;
+  if(plan.repair==='quick')c.damage=Math.max(0,c.damage-0.4);
+  else if(plan.repair==='full')c.damage=0;
+  if(plan.fix)c.issue=null;
+  c.penalty=0;
+  if(c.isPlayer&&plan.driver!==c.di){
+    c.di=plan.driver;const d=c.drivers[c.di];d.stint=0;d.w35=false;d.wFat=false;
+  }
+  if(!c.isPlayer&&plan.mode)c.mode=plan.mode;
+  c.limpWhy=null;c.hold=false;
+}
+function exitPit(c){
+  c.state='run';c.prog=0;c.pitTimer=0;
+  if(c.damage>0.55||(c.issue&&c.issue.major))goLimp(c,c.issue&&c.issue.major?'mech':'damage');
+  if(c.isPlayer){
+    c.quiet=2;c.fastStop=Math.min(c.fastStop||1e9,c.pitTotal);
+    const pos=posOf(c);G.lastPos=pos;
+    const oi=G.order.indexOf(c.idx);
+    const A=oi>0?G.cars[G.order[oi-1]]:null;
+    radio('工程師',`出站！而家 P${pos}${A&&A.state!=='dnf'?`，前車 #${A.num} 相差 ${gapStr(A,c)}`:''}。`,'team');
+  }
+}
+
+/* ---------- AI strategy ---------- */
+function aiCompound(c,atStop){
+  const e=G.env,onW=c.tyre.c==='W';
+  const soon=rainAt(G.t+900)>0.25;
+  let wet=onW?(e.wet>c.ai.wetOff||(soon&&e.wet>0.05)):e.wet>c.ai.wetOn;
+  if(atStop&&!onW&&soon&&e.wet>0.1)wet=true;
+  if(wet)return 'W';
+  if(e.track<23)return c.ai.hardBias?'M':'S';
+  if(e.track>35)return c.ai.hardBias?'H':'M';
+  return c.ai.softBias?'S':'M';
+}
+function aiWantsPit(c){
+  if(c.state==='limp')return true;
+  const fpl=fuelPerLap(c),lapsLeft=c.fuel/fpl;
+  const remain=RACE_LEN-G.t,lapsToEnd=remain/(c.refLT||210)+1;
+  const want=aiCompound(c,false);
+  if((want==='W')!==(c.tyre.c==='W')&&c.sets[setKey(want)]>0){c.ai.mis++;if(c.ai.mis>c.ai.late)return true;}else c.ai.mis=0;
+  if(c.damage>0.3||c.tyre.wear>0.97)return true;
+  if(lapsLeft>=lapsToEnd+0.15)return false;
+  if(lapsLeft<1.12+c.ai.margin)return true;
+  if((G.flag.type==='sc'||G.flag.type==='fcy')&&c.fuel<c.ai.scFuel)return true;
+  if(c.issue&&!c.issue.major&&rnd()<0.3)return true;
+  return false;
+}
+function aiPlan(c){
+  const e=G.env,fpl=fuelPerLap(c),remain=RACE_LEN-G.t;
+  const lapsToEnd=remain/(c.refLT||210)+1.2;
+  let fuel=1-c.fuel;
+  const needEnd=lapsToEnd*fpl+0.03-c.fuel;
+  if(needEnd<fuel)fuel=Math.max(0,needEnd);
+  const stintLaps=Math.min(lapsToEnd,(c.fuel+fuel)/fpl);
+  const want=aiCompound(c,true);
+  const mismatch=(want==='W')!==(c.tyre.c==='W');
+  const proj=c.tyre.wear+wearPerLap(c,c.tyre.c,e)*stintLaps;
+  const scarce=c.sets.dry<remain/(Math.max(1,stintLaps)*(c.refLT||210))/1.8;
+  let tyre=(mismatch||c.punct||proj>(scarce?1:c.ai.wearLimit)||(!scarce&&c.tyre.c==='S'&&e.track>35&&proj>0.6))?want:null;
+  if(tyre&&c.sets[setKey(tyre)]<=0&&!c.punct)tyre=null;
+  const caution=G.flag.type==='sc'||G.flag.type==='fcy';
+  const brakes=c.brakes<0.28||(caution&&c.brakes<0.55&&remain>3*3600);
+  const repair=c.damage>0.5?'full':c.damage>0.12?'quick':null;
+  c.ai.stints++;
+  const driverSwap=c.ai.stints%3===0;
+  if(driverSwap)c.drvOff=Math.max(0,gauss()*0.25+0.3);
+  const mode=remain<3600&&rnd()<0.5?'push':'normal';
+  return {fuel,tyre,brakes,repair,fix:!!c.issue,driverSwap,mode};
+}
+
+/* ---------- player: drivers & rules ---------- */
+function updateDrivers(dt){
+  const c=me();if(c.state==='dnf'||c.state==='done')return;
+  const driving=c.state==='run'||c.state==='limp';
+  c.drivers.forEach((d,i)=>{
+    if(i===c.di){
+      if(!driving)return;
+      d.stint+=dt;d.total+=dt;
+      const k=0.2*(1+0.35*(1-G.env.light))*(1+0.4*G.env.wet)*(c.mode==='push'?1.2:1)/d.stamina;
+      d.fatigue=Math.min(1,d.fatigue+k*dt/3600);
+      if(d.stint>3.5*3600&&!d.w35){d.w35=true;radio('工程師',`${d.tag} 再過 30 分鐘就到 4 小時連續駕駛上限，記得換人。`,'team',true);}
+      if(d.stint>MAX_STINT&&!d.p4){d.p4=true;c.penalty+=60;radio('賽事',`${d.tag} 連續駕駛超過 4 小時：罰 Stop & Go 60 秒，下次入站執行。`,'bad',true);}
+      if(d.total>MAX_TOTAL&&!d.p14){d.p14=true;c.penalty+=120;radio('賽事',`${d.tag} 總駕駛時間超過 14 小時：罰 Stop & Go 120 秒。`,'bad',true);}
+      if(d.fatigue>0.6&&!d.wFat){d.wFat=true;if(!queueCall('driver'))radio(d.tag,'我開始有啲攰，集中力跌緊……','team');}
+    }else d.fatigue=Math.max(0,d.fatigue-0.32*dt/3600);
+  });
+  const e=G.env;
+  if(c.tyre.c!=='W'&&e.wet>0.22&&!c.wetWarn){c.wetWarn=true;const q=c.sets.wet>0&&queueCall('rain');radio(who(c),'條路好濕呀！我要雨胎！','rain',!q);}
+  if(c.tyre.c==='W'&&e.wet<0.1&&!c.dryWarn&&c.tyre.laps>=1){c.dryWarn=true;if(!queueCall('dry'))radio(who(c),'條線乾晒喇，雨胎就嚟熔㗎喇！','rain');}
+  if(c.tmode&&G.t>=c.tmode.until){c.mode=c.tmode.prev;c.tmode=null;radio('工程師',`引擎轉返${MODES[c.mode].name}模式。`,'team');}
+  if(c.pendIssue&&G.t>=c.pendIssue){c.pendIssue=0;if(!c.issue){c.issue={pace:rr(1.5,3),fix:rr(45,80),major:false,label:'引擎過熱'};radio(who(c),'水溫爆錶，動力跌咗！入站要修。','bad',true);}}
+  if(e.wet<0.12)c.wetWarn=false;
+  if(c.tyre.c!=='W'||e.wet>0.18)c.dryWarn=false;
+  if(c.brakes<0.3&&!c.brakeWarn){c.brakeWarn=true;radio(who(c),'剎車踏板好軟，碟片就嚟磨晒。','team');}
+  if(c.brakes>0.5)c.brakeWarn=false;
+}
+
+/* ---------- order, periodic, end ---------- */
+function cmpCars(a,b){
+  const da=a.state==='dnf',db=b.state==='dnf';
+  if(da!==db)return da?1:-1;
+  const A=dist(a)-(a.penLaps||0),B=dist(b)-(b.penLaps||0);
+  if(Math.abs(A-B)>1e-9)return B-A;
+  return (a.finishT??NONE)-(b.finishT??NONE);
+}
+function updateOrder(){
+  G.order=G.cars.slice().sort(cmpCars).map(c=>c.idx);
+  const L=G.order[0];
+  if(L!==G.leaderIdx){
+    const c=G.cars[L];
+    if(G.leaderIdx>=0&&!G.chequer&&(G.t-G.lastLeadMsg>900||c.isPlayer||G.leaderIdx===G.meIdx)){
+      G.lastLeadMsg=G.t;
+      radio('賽事',c.isPlayer?`你領先全場！#${c.num} ${c.team} 升上 P1！`:`#${c.num} ${c.team} 接過領先。`,c.isPlayer?'go':'info');
+    }
+    G.leaderIdx=L;
+  }
+}
+const posOf=c=>G.order.indexOf(c.idx)+1;
+function periodic(){
+  if(G.t>=G.nextHist){G.hist.push({t:G.t,pos:posOf(me())});G.wxHist.push({t:G.t,r:G.wx.rain});G.nextHist+=300;}
+  const h=Math.floor(G.t/3600);
+  if(h>G.hour&&h<24){
+    G.hour=h;const c=me();
+    if(c.state!=='dnf'){
+      const L=G.cars[G.order[0]];
+      radio('工程師',`第 ${h} 小時完成：P${posOf(c)}${L===c?'，領先緊！':`，落後領先者 ${gapStr(L,c)}`}。`,'team');
+    }
+  }
+  const light=G.env.light;
+  if(!G.isNight&&light<0.2){G.isNight=true;radio('天氣','入夜喇。賽道溫度開始回落，軟胎會好用啲，車手都會攰得快啲。','info');}
+  if(G.isNight&&light>0.8){G.isNight=false;radio('天氣','天光喇！賽道溫度會慢慢回升。','info');}
+}
+function checkEnd(){
+  if(G.endSoon){endRace();return;}
+  if(!G.chequer){if(G.t>=RACE_LEN){G.chequer=true;radio('賽事','24 小時到！領先車下一次過線就會揮方格旗。','flag',true);}return;}
+  const c=me();
+  const active=G.cars.filter(x=>x.state!=='dnf'&&x.state!=='done');
+  if(!active.length||G.t>RACE_LEN+1500||(c.state==='done'&&G.t>c.finishT+420))endRace();
+}
+function step(dt){
+  G.t+=dt;
+  G.env=computeEnv(G.t);
+  updateWx(dt);
+  updateFlag(dt);
+  for(const c of G.cars)updateCar(c,dt);
+  updateDrivers(dt);
+  updateOrder();
+  checkPasses();
+  callsTick(dt);
+  periodic();
+  checkEnd();
+}
+
+/* ---------- on-track overtakes involving the player ---------- */
+const FX=[],FLASH={};
+function zoneNear(c){
+  const p=TRACK.at(c.prog),i=TRACK.nearest(p[0],p[1]),N=TRACK.N;
+  let best=ZONES[0],bd=1e9;
+  ZONES.forEach(z=>{const d=Math.min(Math.abs(z.idx-i),N-Math.abs(z.idx-i));if(d<bd){bd=d;best=z;}});
+  return best.name;
+}
+// a pass is a change of running order between two cars that were both on track before and after
+function checkPasses(){
+  const c=me();if(c.state==='dnf'||c.state==='done')return;
+  const rel=G.rel||(G.rel={});
+  const on=x=>x.state==='run'||x.state==='limp';
+  const quiet=G.flag.type==='sc'||G.flag.type==='fcy'||G.winnerIdx>=0;
+  const D=dist(c);
+  for(const o of G.cars){
+    if(o===c)continue;
+    const s=D>dist(o)?1:-1,ok=on(c)&&on(o),pr=rel[o.idx];
+    if(pr&&pr.ok&&ok&&pr.s!==s&&!quiet&&G.t-pr.t>60){rel[o.idx]={s,ok,t:G.t};passEvent(c,o,s>0);}
+    else rel[o.idx]={s,ok,t:pr?pr.t:-1e9};
+  }
+}
+function passEvent(c,o,gained){
+  const pos=posOf(c),where=zoneNear(c),lead=gained&&pos===1;
+  if(gained){c.passes=(c.passes||0)+1;radio(who(c),lead?`爬頭！喺 ${where} 超越 #${o.num}，領先全場！`:`爬頭！喺 ${where} 超越 #${o.num}，升上 P${pos}。`,'go');}
+  else{c.passedBy=(c.passedBy||0)+1;radio(who(c),`喺 ${where} 俾 #${o.num} ${o.team} 爬咗頭，跌到 P${pos}。`,'bad');}
+  FX.push({type:gained?'pass':'passed',rival:o.idx,pos,where,lead});
+  if(FX.length>6)FX.shift();
+}
+
+/* ================= tyre-change timing mini-game ================= */
+// wheel order matches the 3D car: front right, front left, rear right, rear left
+const MINI_WHEELS=['右前','左前','右後','左後'];
+const MINI_SCORE={perfect:-1.4,good:-0.4,miss:2.5,late:3};
+const MINI_LABEL={perfect:'完美！',good:'好',miss:'甩手',late:'太遲'};
+const MINI_PERIOD=[1.0,0.9,0.82,0.75];
+function miniStart(){
+  const e=G.env,k=(e.light<0.4?0.85:1)*(1-0.2*e.wet);   // tighter windows at night and in the wet
+  G.mini={i:0,el:0,at:performance.now(),st:'aim',wait:0,res:[],hx:null,zones:MINI_WHEELS.map(()=>({c:rr(0.22,0.78),gw:0.1*k,pw:0.036*k,s:rnd()}))};
+  renderMini();
+}
+// the cursor bounces across the bar; each wheel sweeps a little faster
+function miniX(m,el){const i=Math.min(m.i,3),ph=(m.zones[i].s*2+el/MINI_PERIOD[i])%2;return ph<1?ph:2-ph;}
+function miniGrade(g,x){const m=G.mini;m.res.push(g);m.hx=x;m.st='flash';m.wait=0.55;renderMini();}
+function miniHit(){
+  const m=G&&G.mini;if(!m||m.st!=='aim'||G.paused)return;
+  const el=m.el+(performance.now()-m.at)/1000,z=m.zones[m.i],x=miniX(m,el),d=Math.abs(x-z.c);
+  miniGrade(d<=z.pw?'perfect':d<=z.gw?'good':'miss',x);
+}
+function miniTick(dt){
+  const m=G.mini;m.at=performance.now();
+  if(m.st==='aim'){m.el+=dt;if(m.el>2.6)miniGrade('late',miniX(m,m.el));}
+  else{
+    m.wait-=dt;
+    if(m.wait<=0){
+      if(m.st==='flash'){m.i++;m.el=0;m.hx=null;if(m.i>=4){m.st='sum';m.wait=1.3;}else m.st='aim';}
+      else{miniClose();return;}
+    }
+  }
+  renderMini();
+}
+function miniClose(){
+  const c=me(),m=G.mini,sv=c.svc,ph=sv.phases.find(p=>p[0]==='tyre');
+  const d=Math.max(8-ph[1],m.res.reduce((s,g)=>s+MINI_SCORE[g],0));
+  ph[1]+=d;c.pitTimer+=d;c.pitTotal+=d;c.pitTime+=d;sv.miniDelta=d;sv.miniDone=true;
+  const n=g=>m.res.filter(x=>x===g).length,nMiss=n('miss')+n('late');
+  c.miniPerf=(c.miniPerf||0)+n('perfect');c.miniN=(c.miniN||0)+4;
+  radio('維修站',`換胎：${n('perfect')} 個完美、${n('good')} 個好${nMiss?`、${nMiss} 個失手`:''}，${d<=0?'慳咗':'蝕咗'} ${Math.abs(d).toFixed(1)}s。`,d<=0?'go':'bad');
+  G.mini=null;renderMini();
+}
+function renderMini(){
+  const el=$('#mini'),m=G&&G.running?G.mini:null;
+  if(!m){el.hidden=true;return;}
+  el.hidden=false;
+  const i=Math.min(m.i,3),z=m.zones[i],g=$('#miniGrade'),hit=$('#miniHit');
+  for(let k=0;k<4;k++){const r=m.res[k];$('#mw'+k).setAttribute('class','mc-w'+(r?' '+r:k===m.i&&m.st==='aim'?' now':''));}
+  if(m.st==='sum'){
+    const d=m.res.reduce((s,x)=>s+MINI_SCORE[x],0);
+    $('#miniTitle').textContent='換胎完成';g.className='mini-g '+(d<=0?'perfect':'miss');
+    g.textContent=`${m.res.filter(x=>x==='perfect').length} / 4 完美 · ${d<=0?'慳咗':'蝕咗'} ${Math.abs(d).toFixed(1)}s`;
+  }else if(m.st==='flash'){
+    const r=m.res[m.res.length-1];g.className='mini-g '+r;
+    g.textContent=`${MINI_WHEELS[i]}輪 ${MINI_LABEL[r]} ${MINI_SCORE[r]>0?'+':'−'}${Math.abs(MINI_SCORE[r]).toFixed(1)}s`;
+  }else{$('#miniTitle').textContent='撳掣緊螺絲！';g.className='mini-g';g.textContent=`${MINI_WHEELS[i]}輪 · ${i+1} / 4`;}
+  hit.disabled=m.st!=='aim';
+  $('#mZoneG').style.cssText=`left:${((z.c-z.gw)*100).toFixed(2)}%;width:${(z.gw*200).toFixed(2)}%`;
+  $('#mZoneP').style.cssText=`left:${((z.c-z.pw)*100).toFixed(2)}%;width:${(z.pw*200).toFixed(2)}%`;
+  $('#mCursor').style.left=((m.st==='aim'?miniX(m,m.el):m.hx??z.c)*100).toFixed(2)+'%';
+  $('#mTrack').className='mini-track'+(m.st==='flash'?' fl-'+m.res[m.res.length-1]:'');
+}
+
+/* ================= engineer calls: timed decisions ================= */
+const CALL_GAP=2700,CALL_SECS=10;
+const URGENT={sc:1,rain:1,undercut:1};
+// the car directly ahead (dir -1) or behind (dir 1) on the same lap and on track
+function neighbour(c,dir){
+  const i=G.order.indexOf(c.idx),o=G.cars[G.order[i+dir]];
+  if(!o||o.state!=='run'||o.delay>0)return null;
+  const dl=dir<0?dist(o)-dist(c):dist(c)-dist(o);
+  if(dl<=0||dl>=1)return null;
+  return {o,s:dl*lapRef(c)};
+}
+const pct=p=>Math.round(clamp(p,0,1)*20)*5+'%';
+function attackP(c,o){const d=c.drivers[c.di],e=G.env;return clamp(0.42+0.12*clamp(o.refLT-c.refLT,-2,3)+(d.skill-0.93)*2.5-d.fatigue*0.25-e.wet*(1-d.rain)*0.8,0.12,0.88);}
+function defendP(c,o){const d=c.drivers[c.di];return clamp(0.62-0.12*clamp(c.refLT-o.refLT,0,3)+(d.cons-1)*0.8+(d.skill-0.93)*1.5-d.fatigue*0.2,0.15,0.85);}
+function bestRainDriver(c){let b=0;c.drivers.forEach((d,i)=>{if(d.rain-d.fatigue*0.2>c.drivers[b].rain-c.drivers[b].fatigue*0.2)b=i;});return b;}
+const hintAdd=(c,h)=>{c.hint=Object.assign(c.hint||{},h);};
+const CALLS={
+  attack:{
+    build(c,{r,gap}){const o=G.cars[r],p=attackP(c,o);return {tag:'攻擊機會',title:`追到 #${o.num} ${o.team} 車尾`,
+      text:`前車只差 ${gap.toFixed(1)}s，${gap>1.2?'追近佢要推一兩圈，':''}${pick(['Mulsanne 嘅剎車位','Arnage 入彎','Hunaudières 第二個減速彎'])}有機會。${c.drivers[c.di].tag} 疲勞 ${Math.round(c.drivers[c.di].fatigue*100)}%。`,
+      opts:[{k:'go',label:'搏爬頭',hint:`成功率約 ${pct(p)} · 失敗蝕 1–3s，有機會撞車`},{k:'slip',label:'跟車慳油',hint:'吸尾流 3 圈 · 油耗 −12%'},{k:'box',label:'本圈入站 Undercut',hint:'早佢入站，出嚟用新胎追'}],def:1};},
+    act:{
+      go(c,{r}){const o=G.cars[r];if(o.state!=='run'){radio('工程師','機會冇咗，前車已經唔喺度。','team');return;}
+        const p=attackP(c,o);c.callTry=(c.callTry||0)+1;
+        if(rnd()<p){c.callWin=(c.callWin||0)+1;const nb=neighbour(c,-1);o.delay+=(nb&&nb.o===o?nb.s:1)+0.6;radio(who(c),`收到！喺 ${zoneNear(c)} 剎遲過佢！`,'go');}
+        else{c.delay+=rr(1.2,2.8);
+          if(rnd()<0.18){c.damage=Math.min(1,c.damage+rr(0.08,0.22));o.damage=Math.min(1,o.damage+rr(0.04,0.14));c.incidents++;radio(who(c),`撞到 #${o.num}！車頭有損傷（${Math.round(c.damage*100)}%）。`,'bad');}
+          else radio(who(c),'佢關咗門，搏唔入，蝕咗少少時間。','bad');}},
+      slip(c){c.slipUntil=G.t+3*c.curLT;radio('工程師','收到，跟車慳油，等佢犯錯。','team');},
+      box(c){c.boxCall=true;radio('工程師','Box, box！本圈入站做 Undercut。','team');},
+    }},
+  defend:{
+    build(c,{r,gap}){const o=G.cars[r],p=defendP(c,o);return {tag:'防守',title:`#${o.num} ${o.team} 貼住車尾`,
+      text:`後車平均每圈快你大約 ${Math.max(0,c.refLT-o.refLT).toFixed(1)}s，差距得返 ${gap.toFixed(1)}s。`,
+      opts:[{k:'block',label:'守線',hint:`守得住約 ${pct(p)} · 輪胎多磨 2%，有機會碰撞`},{k:'let',label:'讓佢過，保輪胎',hint:'蝕大約 1s · 冇風險'},{k:'push',label:'全力反擊 3 圈',hint:'引擎轉全力 · 油耗同輪胎損耗增加'}],def:0};},
+    act:{
+      block(c,{r}){const o=G.cars[r];if(o.state!=='run')return;const p=defendP(c,o);c.callTry=(c.callTry||0)+1;c.tyre.wear+=0.02;
+        if(rnd()<p){c.callWin=(c.callWin||0)+1;o.delay+=rr(0.8,1.8);radio(who(c),'守住咗！佢要等下一條直路。','go');}
+        else{const nb=neighbour(c,1);c.delay+=(nb&&nb.o===o?nb.s:0.5)+0.5;
+          if(rnd()<0.1){c.damage=Math.min(1,c.damage+rr(0.06,0.18));c.incidents++;radio(who(c),'佢硬插入嚟撞到我！','bad');}else radio(who(c),'守唔住，佢喺外線過咗。','bad');}},
+      let(c){const nb=neighbour(c,1);c.delay+=(nb?nb.s:0.5)+0.4;radio(who(c),'OK，讓佢過，唔同佢鬥。','team');},
+      push(c){tempMode(c,'push',3);},
+    }},
+  sc:{
+    build(c,{fcy}){return {tag:fcy?'FCY':'安全車',title:fcy?'全場黃旗！要唔要入站？':'安全車出動！要唔要入站？',
+      text:`而家入站嘅損失比平時少一半以上。燃油剩 ${Math.round(c.fuel*100)}%（約 ${(c.fuel/fuelPerLap(c)).toFixed(1)} 圈），輪胎磨損 ${Math.round(c.tyre.wear*100)}%。`,
+      opts:[{k:'box',label:'即刻入站',hint:'加滿油，需要就換胎'},{k:'fuel',label:'只入油，快入快出',hint:'唔換胎、唔換人，停站最短'},{k:'stay',label:'留喺賽道',hint:'保住位置，等綠旗'}],def:c.fuel<0.55?0:2};},
+    act:{box(c){c.boxCall=true;c.hint=null;radio('工程師','Box！趁安全車入站。','team');},fuel(c){c.boxCall=true;c.hint={fuelOnly:true};radio('工程師','Box！只入油，快入快出。','team');},stay(){radio('工程師','收到，留喺賽道保位。','team');}}},
+  rain:{
+    build(c){const b=bestRainDriver(c),bd=c.drivers[b],f=forecast();
+      const opts=[{k:'wet',label:'即刻換雨胎',hint:`本圈入站 · 雨胎剩 ${c.sets.wet} 套`}];
+      if(b!==c.di)opts.push({k:'swap',label:`換雨胎，交俾 ${bd.tag}`,hint:`${bd.tag} 係隊入面雨戰最強`});
+      opts.push({k:'stay',label:'頂住，睇吓雨勢',hint:`雷達 30 分鐘：${Math.round(f[2].p*100)}% 有雨`});
+      return {tag:'天氣',title:'落雨喇！換唔換胎？',text:`雨勢${G.wx.rain>0.4?'唔細':'仲細'}，賽道濕度 ${Math.round(G.env.wet*100)}%。濕度過咗大約 20%，雨胎先會快過光頭胎。`,opts,def:opts.length-1};},
+    act:{wet(c){c.boxCall=true;c.hint={tyre:'W'};radio('工程師','Box！換雨胎。','team');},
+      swap(c){const b=bestRainDriver(c);c.boxCall=true;c.hint={tyre:'W',driver:b};radio('工程師',`Box！換雨胎，交俾 ${c.drivers[b].tag}。`,'team');},
+      stay(){radio('工程師','收到，再頂一陣。','team');}}},
+  dry:{
+    build(c){return {tag:'天氣',title:'條線乾緊',text:`賽道濕度跌到 ${Math.round(G.env.wet*100)}%，雨胎開始過熱。光頭胎剩 ${c.sets.dry} 套。`,
+      opts:[{k:'dry',label:'本圈換返光頭胎',hint:'入站換胎'},{k:'stay',label:'再用多兩圈雨胎',hint:'等條線乾多啲 · 雨胎會磨得好快'}],def:1};},
+    act:{dry(c){c.boxCall=true;c.hint={tyre:'dry'};radio('工程師','Box！換返光頭胎。','team');},stay(){radio('工程師','收到，再用多兩圈。','team');}}},
+  undercut:{
+    build(c,{r}){const o=G.cars[r];return {tag:'對手入站',title:`前車 #${o.num} ${o.team} 入咗站！`,
+      text:`佢出站會用新胎追你。你燃油剩 ${Math.round(c.fuel*100)}%，輪胎磨損 ${Math.round(c.tyre.wear*100)}%。`,
+      opts:[{k:'box',label:'本圈即刻入站應對',hint:'跟佢同步入站，保住相對位置'},{k:'over',label:'Overcut：全力推 2 圈',hint:'趁佢出站胎未熱拉開距離'},{k:'stay',label:'照原計劃',hint:'唔使理佢'}],def:2};},
+    act:{box(c){c.boxCall=true;radio('工程師','Box！跟佢入站。','team');},over(c){tempMode(c,'push',2);},stay(){radio('工程師','收到，照原計劃。','team');}}},
+  traffic:{
+    build(){return {tag:'車流',title:'前面有一串 LMGT3',text:`${pick(['Hunaudières','Mulsanne 前','Porsche Curves 出口','Tertre Rouge'])}前面有幾架 GT 車擠埋一齊。`,
+      opts:[{k:'dive',label:'一次過晒佢哋',hint:'快大約 1.5s · 約 10% 機會擦撞'},{k:'wait',label:'耐心跟，等直路',hint:'蝕大約 1s · 冇風險'}],def:1};},
+    act:{dive(c){if(rnd()<0.1){c.damage=Math.min(1,c.damage+rr(0.06,0.2));c.delay+=rr(2,4);c.incidents++;radio(who(c),'同架 GT3 擦咗一下！','bad');}else{addMod(c,-1.5,c.curLT);radio(who(c),'一次過晒！','go');}},
+      wait(c){addMod(c,1.0,c.curLT);radio(who(c),'收到，等直路先過。','team');}}},
+  mech:{
+    build(){return {tag:'機械',title:'引擎水溫偏高',text:'數據顯示冷卻系統吃力，繼續全速跑有機會出事。',
+      opts:[{k:'cool',label:'轉省油冷卻 3 圈',hint:'每圈慢約 0.9s · 問題解決'},{k:'risk',label:'照跑',hint:'約 35% 機會之後出故障'},{k:'check',label:'下次入站檢查',hint:'入站多 30s · 之後 3 小時唔會機械故障'}],def:0};},
+    act:{cool(c){tempMode(c,'save',3);},risk(c){if(rnd()<0.35)c.pendIssue=G.t+rr(120,900);radio('工程師','收到，照跑，我哋會盯住數據。','team');},check(c){hintAdd(c,{check:true});radio('工程師','下次入站做引擎檢查。','team');}}},
+  debris:{
+    build(){return {tag:'車損',title:'前翼撞到碎片',text:'下壓力少咗，每圈慢大約 0.7s，入站要多停 10 秒清理。',
+      opts:[{k:'box',label:'本圈入站清理',hint:'多停 10s'},{k:'later',label:'頂住，下次入站先清',hint:'每圈慢 0.7s 直到入站'}],def:1};},
+    act:{box(c){c.issue=c.issue||{pace:0.7,fix:10,major:false,label:'前翼有碎片'};c.boxCall=true;radio('工程師','Box，清理前翼。','team');},
+      later(c){c.issue=c.issue||{pace:0.7,fix:10,major:false,label:'前翼有碎片'};radio('工程師','收到，下次入站先清。','team');}}},
+  driver:{
+    build(c){const d=c.drivers[c.di],late=d.stint>3*3600;return {tag:'車手',title:`${d.tag}：「我仲頂得順！」`,
+      text:`${d.tag} 已經連續揸咗 ${fmtHM(d.stint)}，疲勞 ${Math.round(d.fatigue*100)}%，佢想再揸多一節。`,
+      opts:[{k:'keep',label:'准，再揸一節',hint:late?'士氣高，但小心 4 小時上限':'士氣高 · 20 分鐘內每圈快 0.2s，但會更攰'},{k:'next',label:'下次入站換人',hint:'揀休息得最好嘅車手'},{k:'now',label:'即刻入站換人',hint:'本圈入站'}],def:1};},
+    act:{keep(c){addMod(c,-0.2,1200);hintAdd(c,{keepDriver:true,swap:false});radio(c.drivers[c.di].tag,'多謝！我會頂住！','go');},
+      next(c){hintAdd(c,{swap:true,keepDriver:false});radio('工程師','收到，下次入站換人。','team');},
+      now(c){c.boxCall=true;hintAdd(c,{swap:true,keepDriver:false});radio('工程師','Box！換人。','team');}}},
+};
+function queueCall(type,data){
+  if(!G||!G.cars.length)return false;
+  const c=me();
+  if(!G.running||G.ended||G.chequer||c.state==='dnf'||c.state==='done'||c.state==='pit')return false;
+  if(G.call&&!(URGENT[type]&&!URGENT[G.call.type]))return false;
+  if(c.boxCall&&(type==='sc'||type==='rain'||type==='dry'||type==='undercut'))return false;
+  const b=CALLS[type].build(c,data||{});
+  G.call=Object.assign({type,data:data||{},left:CALL_SECS},b);
+  G.lastCall=G.t;
+  return true;
+}
+// wheel-to-wheel battles at most every 20 race minutes, random race situations every 45
+function callsTick(dt){
+  const c=me();
+  if(G.call||!G.running||G.chequer||c.state!=='run'||c.delay>0)return;
+  if(G.flag.type!=='green'&&G.flag.type!=='slow')return;
+  const since=G.t-(G.lastCall||0);
+  if(since<1200)return;
+  const cd=G.cd||(G.cd={});
+  const a=neighbour(c,-1),b=neighbour(c,1);
+  if(a&&a.s<2&&c.refLT<a.o.refLT+0.5&&!(cd.attack>G.t)){cd.attack=G.t+1500;queueCall('attack',{r:a.o.idx,gap:a.s});return;}
+  if(b&&b.s<1.5&&b.o.refLT<c.refLT+0.3&&!(cd.defend>G.t)){cd.defend=G.t+1500;queueCall('defend',{r:b.o.idx,gap:b.s});return;}
+  if(since<CALL_GAP)return;
+  const h=dt/3600;
+  if(rnd()<0.9*h)queueCall('traffic');
+  else if(rnd()<0.22*h&&c.mode!=='save')queueCall('mech');
+  else if(rnd()<0.18*h&&!c.issue)queueCall('debris');
+}
+function chooseCall(i,auto){
+  const call=G&&G.call;if(!call)return;const o=call.opts[i];if(!o)return;
+  G.call=null;G.callsMade=(G.callsMade||0)+1;
+  if(auto)radio('工程師',`時間到，照預設：${o.label}。`,'info');
+  CALLS[call.type].act[o.k](me(),call.data);
+  renderCall();renderSlow();
+}
+
+/* ================= radio ================= */
+function radio(from,text,kind,pause){
+  if(!G)return;
+  G.log.unshift({t:G.t,from,text,kind:kind||'info'});
+  if(G.log.length>90)G.log.pop();
+  G.logDirty=true;
+  if(pause&&G.opt.autoPause&&G.running&&!G.modal){G.paused=true;G.pauseMsg=text;}
+}
+
+/* ================= new game ================= */
+function newGame(){
+  const sel=pickedTeam();
+  const opt={diff:START.diff,weather:START.weather,team:sel.team,
+    guard:$('#optGuard').checked,dialog:$('#optDialog').checked,autoPause:$('#optAutoPause').checked,pitCam:$('#optPitCam').checked,mini:$('#optMini').checked};
+  G={t:0,speed:1,paused:false,running:true,ended:false,modal:null,opt,env:null,
+    wx:{rain:0,wet:0,showers:genShowers(opt.weather)},
+    fc:{bias:FC_H.map(()=>clamp(gauss()*0.5,-1,1)),next:360,warned:false},
+    flag:{type:'green',until:0,since:0,cause:'',zone:0},flagHist:[],wxHist:[],hist:[],log:[],
+    fastest:{t:NONE,num:null},chequer:false,winnerIdx:-1,hour:0,isNight:false,leaderIdx:-1,lastLeadMsg:-1e9,
+    nextHist:0,cars:[],order:[],meIdx:0,plan:null,logDirty:true,lastPos:0,endSoon:false,result:null,pauseMsg:''};
+  G.env=computeEnv(0);
+  TEAMS.forEach(t=>{
+    if(!sel.custom&&t.num===sel.num)return;   // the player drives this entry
+    const c=mkCar({num:t.num,team:t.team,mk:t.mk,ab:t.ab,car:t.car,liv:t.liv,color:t.dot,q:t.q,isPlayer:false,pace:racePace(t)+gauss()*0.05,
+      ai:{margin:rnd()*0.2,scFuel:rr(0.35,0.65),wetOn:rr(0.2,0.3),wetOff:rr(0.08,0.12),wearLimit:rr(0.78,0.95),crew:t.crew*rr(0.99,1.03),
+        risk:rr(0.75,1.3),rel:t.rel*rr(0.85,1.15),tyre:rr(0.95,1.05),fuel:rr(0.98,1.02),rainOff:t.rain*rr(0.6,1.4)*1.25,softBias:rnd()<0.35,hardBias:rnd()<0.3,stints:0,late:Math.floor(rnd()*2),mis:0}});
+    c.drvOff=Math.max(0,gauss()*0.12+0.3);
+    G.cars.push(c);
+  });
+  G.cars.forEach(c=>{c.tyre={c:aiCompound(c,true),wear:0,laps:0};});
+  const p=mkCar({num:sel.num,team:sel.team,mk:sel.mk,ab:sel.ab,car:sel.car,liv:sel.liv,color:sel.dot,q:sel.q,rel:sel.rel,crew:sel.crew,isPlayer:true,pace:racePace(sel)+DIFF_PACE[opt.diff],
+    drivers:DRIVERS.map(d=>Object.assign({},d,{stint:0,total:0,fatigue:0})),di:START.driver,tyre:{c:START.tyre,wear:0,laps:0},quiet:0});
+  G.cars.push(p);
+  G.cars.forEach((c,i)=>{c.idx=i;c.noise=lapNoise();});
+  G.meIdx=p.idx;
+  // grid follows the 2026 Hyperpole order, shuffled a little
+  const q=G.cars.map(c=>({c,q:(c.q==null?9:c.q)+gauss()*1.6})).sort((a,b)=>a.q-b.q);
+  q.forEach((o,k)=>{o.c.grid=k+1;o.c.prog=-k*0.0045;});
+  updateOrder();
+  G.lastPos=posOf(p);
+  radio('賽事',`綠旗！24 小時耐力賽開始。#${p.num} ${p.team} 由 P${p.grid} 起步，${p.drivers[p.di].tag} 揸頭棒。`,'go');
+  setupRaceUI();
+}
+
+/* ================= pit dialog ================= */
+function recTyre(c){
+  const e=G.env,f=forecast();
+  if(e.wet>0.2||(e.wet>0.08&&f[0].p>0.7&&f[0].inten>0.25))return 'W';
+  if(e.track<23)return 'S';
+  if(e.track>35)return 'M';
+  return 'M';
+}
+function fuelToEnd(c){
+  const remain=RACE_LEN-G.t;
+  const laps=Math.ceil(remain/(c.refLT||210))+1;
+  return clamp(laps*fuelPerLap(c)+0.02-c.fuel,0,1-c.fuel);
+}
+function defaultPlan(c){
+  const e=G.env,fpl=fuelPerLap(c),h=c.hint||{};
+  let fuel=1-c.fuel;const toEnd=fuelToEnd(c);
+  if(c.fuel+toEnd<1-1e-6&&toEnd<fuel)fuel=toEnd;
+  const stint=(c.fuel+fuel)/fpl;
+  let rec=recTyre(c);
+  if(h.tyre==='W')rec='W';else if(h.tyre==='dry'&&rec==='W')rec='M';
+  const mismatch=(rec==='W')!==(c.tyre.c==='W');
+  const proj=c.tyre.wear+wearPerLap(c,c.tyre.c,e)*stint;
+  const scarce=c.sets.dry<(RACE_LEN-G.t)/(Math.max(1,stint)*(c.refLT||210))/1.8;
+  let tyre=(c.punct||mismatch||h.tyre||proj>(scarce?0.97:0.85))?rec:null;
+  if(h.fuelOnly&&!c.punct&&!mismatch)tyre=null;
+  if(tyre&&c.sets[setKey(tyre)]<=0&&!c.punct)tyre=null;
+  let driver=c.di;const cur=c.drivers[c.di];
+  if(h.driver!=null&&h.driver!==c.di)driver=h.driver;
+  else if(!h.fuelOnly&&!h.keepDriver&&(h.swap||cur.stint>2.6*3600||cur.fatigue>0.55)){
+    let best=-1,bs=1e9;
+    const remain=Math.max(1,RACE_LEN-G.t);
+    c.drivers.forEach((d,i)=>{if(i===c.di)return;const need=Math.max(0,MIN_TOTAL-d.total);const s=d.fatigue*2+d.total/MAX_TOTAL-(need>0?0.3+need/remain*3:0);if(s<bs){bs=s;best=i;}});
+    if(best>=0)driver=best;
+  }
+  const caution=G.flag.type==='sc'||G.flag.type==='fcy';
+  const brakes=c.brakes<0.25||(!h.fuelOnly&&caution&&c.brakes<0.5&&RACE_LEN-G.t>3*3600);
+  let repair=null;
+  if(c.damage>0.55)repair=c.damage-0.4>0.55?'full':'quick';
+  else if(c.damage>0.1&&!h.fuelOnly)repair='quick';
+  return {fuel,tyre,driver,brakes,repair,fix:!!c.issue,check:!!h.check};
+}
+function openPit(c){
+  G.plan=defaultPlan(c);
+  if(!G.opt.dialog){commitPit();return;}
+  G.modal='pit';
+  buildPitUI();
+  $('#pitOv').hidden=false;
+  setTimeout(()=>$('#pmGo').focus(),30);
+}
+function buildPitUI(){
+  const c=me(),e=G.env;
+  $('#pitTitle span').textContent='#'+c.num;
+  $('#pmSub').textContent=`第 ${c.lap} 圈完成 · ${todStr(G.t)} · 剩餘 ${fmtHMS(RACE_LEN-G.t)}`;
+  const fc=$('#pmFlag');fc.dataset.f=G.flag.type;fc.textContent=flagLabel();
+  const mx=Math.round((1-c.fuel)*100);
+  const fr=$('#pmFuel');fr.max=mx;fr.value=Math.round(G.plan.fuel*100);
+  $('#pmFuelNow').textContent=`現時 ${Math.round(c.fuel*100)}%`;
+  const rec=recTyre(c);
+  const opts=[['keep','繼續用'],['S','軟胎'],['M','中性胎'],['H','硬胎'],['W','雨胎']];
+  const base=Math.min(...['S','M','H','W'].map(k=>tyreDelta({c:k,wear:0},e)));
+  $('#pmTyres').innerHTML=opts.map(([k,nm])=>{
+    if(k==='keep'){
+      return `<button type="button" class="tyopt" data-tyre="keep" ${c.punct?'disabled':''}><span class="ty ty-${c.tyre.c}">${c.tyre.c}</span><b>${nm}</b><span>${Math.round(c.tyre.wear*100)}% · ${c.tyre.laps} 圈</span><span>${c.punct?'爆咗':'+'+(tyreDelta(c.tyre,e)-base).toFixed(1)+'s'}</span></button>`;
+    }
+    const d=tyreDelta({c:k,wear:0},e)-base,w=wearPerLap(c,k,e),left=c.sets[setKey(k)];
+    return `<button type="button" class="tyopt" data-tyre="${k}" ${left<=0?'disabled':''}><span class="ty ty-${k}">${k}</span><b>${nm}</b><span>${(w*100).toFixed(1)}%/圈</span><span>${d<0.05?'最快':'+'+d.toFixed(1)+'s'}</span><span class="left">${left>0?`剩 ${left} 套`:'冇配額'}</span>${k===rec&&left>0?'<span class="rec">建議</span>':''}</button>`;
+  }).join('');
+  $('#pmTyreNow').textContent=`賽道 ${Math.round(e.track)}° · 濕度 ${Math.round(e.wet*100)}% · 配額 乾 ${c.sets.dry} / 雨 ${c.sets.wet}`;
+  $('#pmDrivers').innerHTML=c.drivers.map((d,i)=>{
+    const st=i===c.di?`駕駛中 ${fmtHM(d.stint)}`:'休息中';
+    return `<button type="button" class="drvopt" data-driver="${i}"><b>${d.tag}</b><span class="nm">${esc(d.name)} · ${d.grade}</span><span class="mono" style="font-size:12px">${fmtHM(d.total)}</span><span class="meta">${st} · 疲勞 ${Math.round(d.fatigue*100)}% · ${d.total>=MIN_TOTAL?'已達 6h ✓':'仲差 '+fmtHM(MIN_TOTAL-d.total)}</span></button>`;
+  }).join('');
+  $('#pmBrakes').checked=G.plan.brakes;
+  $('#pmBrakesTxt').textContent=`更換剎車碟（+${BRAKE_TIME}s 車房）· 現時 ${Math.round(c.brakes*100)}%`;
+  $('#pmRepairWrap').hidden=c.damage<0.01;
+  $('#pmRepairInfo').innerHTML=`車身損傷 <b>${Math.round(c.damage*100)}%</b>（每圈慢約 ${(c.damage*12).toFixed(1)}s）· 快修 35s 減 40% · 全修 ${Math.round(60+c.damage*420)}s`;
+  const mustRepair=c.damage>0.55;
+  $('#pmRepair').querySelector('[data-rep=none]').disabled=mustRepair;
+  $('#pmRepair').querySelector('[data-rep=quick]').disabled=c.damage-0.4>0.55;
+  $('#pmFixWrap').hidden=!c.issue;
+  if(c.issue){$('#pmFix').checked=G.plan.fix;$('#pmFix').disabled=c.issue.major;$('#pmFixTxt').textContent=`修理 ${c.issue.label}（+${Math.round(c.issue.fix)}s 車房）${c.issue.major?'：必須修理':`，唔修每圈慢 ${c.issue.pace.toFixed(1)}s`}`;}
+  $('#pmPen').innerHTML=[c.penalty?`<b style="color:var(--violet)">執行罰時：Stop & Go ${c.penalty}s</b>`:'',G.plan.check?'<b>引擎檢查 +30s（之後 3 小時唔會機械故障）</b>':''].filter(Boolean).join('<br>');
+  updatePitUI();
+}
+function updatePitUI(){
+  const c=me(),pl=G.plan,e=G.env;
+  const fpl=fuelPerLap(c),after=c.fuel+pl.fuel;
+  const s=serviceTime(c,pl);
+  $('#pmFuelInfo').innerHTML=`出站燃油 <b>${Math.round(after*100)}%</b> ≈ <b>${(after/fpl).toFixed(1)}</b> 圈（${MODES[c.mode].name}模式）· 加油 ${s.fuelT.toFixed(1)}s`;
+  const te=fuelToEnd(c);const be=$('#pmFuelEnd');be.disabled=c.fuel+te>=1-1e-6&&te>=1-c.fuel-1e-6;
+  be.textContent=be.disabled?'夠跑到終點（一缸唔夠）':`夠跑到終點（${Math.round(te*100)}%）`;
+  document.querySelectorAll('#pmTyres .tyopt').forEach(b=>{const k=b.dataset.tyre;b.setAttribute('aria-pressed',String(k==='keep'?!pl.tyre:pl.tyre===k));});
+  const stint=after/fpl;
+  const tc=pl.tyre||c.tyre.c,tw=pl.tyre?0:c.tyre.wear;
+  const endW=tw+wearPerLap(c,tc,e)*stint;
+  $('#pmTyreInfo').innerHTML=`跑完下一節（約 ${stint.toFixed(0)} 圈）預計磨損 <b style="color:${endW>0.9?'var(--stop)':endW>0.75?'var(--caution)':'var(--ink)'}">${Math.round(endW*100)}%</b>${pl.tyre?` · 換胎 ${pl.brakes?'於車房內同步':TYRE_TIME+'s'}`:''}`;
+  document.querySelectorAll('#pmDrivers .drvopt').forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.driver===pl.driver)));
+  document.querySelectorAll('#pmRepair .chipbtn').forEach(b=>b.setAttribute('aria-pressed',String((b.dataset.rep==='none'&&!pl.repair)||b.dataset.rep===pl.repair)));
+  // time bar
+  const segs=[['s-lane',s.lane,'通道'],['s-fuel',s.base,'加油'],['s-tyre',s.tyreT,'換胎'],['s-gar',s.garage,'車房'],['s-pen',s.pen,'罰時']].filter(x=>x[1]>0.05);
+  const scale=Math.max(s.total,150);
+  $('#pmBar').innerHTML=segs.map(([k,v,l])=>`<i class="${k}" style="width:${v/scale*100}%" title="${l} ${v.toFixed(1)}s">${v/scale>0.08?v.toFixed(0)+'s':''}</i>`).join('');
+  $('#pmTotal').textContent=s.total.toFixed(1)+'s';
+  const rj=projectRejoin(c,s.total);
+  $('#pmRejoin').textContent='P'+rj.pos;
+  $('#pmRejoinGap').innerHTML=[rj.ahead?`前 #${rj.ahead.num} +${rj.ga}`:'領先出站',rj.behind?`後 #${rj.behind.num} −${rj.gb}`:''].filter(Boolean).join(' · ');
+}
+function projectRejoin(c,T){
+  const D=dist(c);
+  const arr=G.cars.filter(o=>o!==c&&o.state!=='dnf').map(o=>{
+    let d=dist(o);
+    if(o.state!=='done'){
+      let tt=T;if(o.state==='pit')tt=Math.max(0,T-(o.hold?0:o.pitTimer));
+      tt=Math.max(0,tt-o.delay);
+      d+=tt/(o.curLT||210);
+    }
+    return {o,d};
+  });
+  const ahead=arr.filter(x=>x.d>D).sort((a,b)=>a.d-b.d);
+  const behind=arr.filter(x=>x.d<=D).sort((a,b)=>b.d-a.d);
+  const fmt=(dl,o)=>dl>=1?Math.floor(dl)+' 圈':(dl*lapRef(o)).toFixed(1)+'s';
+  return {pos:ahead.length+1,ahead:ahead[0]?ahead[0].o:null,ga:ahead[0]?fmt(ahead[0].d-D,c):'',behind:behind[0]?behind[0].o:null,gb:behind[0]?fmt(D-behind[0].d,behind[0].o):''};
+}
+function commitPit(){
+  const c=me(),pl=G.plan;
+  if(c.punct&&!pl.tyre)pl.tyre=c.tyre.c;
+  if(c.issue&&c.issue.major)pl.fix=true;
+  const s=serviceTime(c,pl);
+  const bits=[];
+  if(pl.fuel>0.005)bits.push(`加油 ${Math.round(pl.fuel*100)}%`);
+  if(pl.tyre)bits.push(`換${TYRES[pl.tyre].name}`);
+  if(pl.driver!==c.di)bits.push(`交棒 ${c.drivers[pl.driver].tag}`);
+  if(pl.brakes)bits.push('換剎車');
+  if(pl.repair)bits.push(pl.repair==='full'?'全面維修':'快修');
+  if(pl.fix&&c.issue)bits.push('修理'+c.issue.label);
+  if(c.penalty)bits.push(`罰時 ${c.penalty}s`);
+  if(pl.check)bits.push('引擎檢查');
+  radio('維修站',`第 ${c.stops} 次入站：${bits.join('、')||'只係停一停'}，預計 ${s.total.toFixed(1)}s。`,'team');
+  startService(c,pl);
+  c.hint=null;
+  G.modal=null;G.plan=null;
+  $('#pitOv').hidden=true;
+}
+
+/* ================= rendering ================= */
+const SKY={night:[13,19,38],dusk:[196,104,60],day:[58,104,166]};
+function skyColor(light){
+  const m=(a,b,t)=>a.map((x,i)=>Math.round(x+(b[i]-x)*t));
+  return light<0.5?m(SKY.night,SKY.dusk,light*2):m(SKY.dusk,SKY.day,(light-0.5)*2);
+}
+let skyBase=null;
+function drawSky(){
+  const cv=$('#sky');const w=cv.clientWidth,h=cv.clientHeight;if(!w)return;
+  const dpr=window.devicePixelRatio||1;
+  if(cv.width!==Math.round(w*dpr)){cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);skyBase=null;}
+  const ctx=cv.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);
+  if(!skyBase){
+    skyBase=document.createElement('canvas');skyBase.width=cv.width;skyBase.height=cv.height;
+    const b=skyBase.getContext('2d');b.setTransform(dpr,0,0,dpr,0,0);
+    for(let x=0;x<w;x++){const t=x/w*RACE_LEN;const tod=((START_TOD+t)%86400)/3600;const c=skyColor(lightAt(tod));b.fillStyle=`rgb(${c})`;b.fillRect(x,0,1.5,h);}
+  }
+  ctx.clearRect(0,0,w,h);ctx.drawImage(skyBase,0,0,w,h);
+  if(!G)return;
+  const X=t=>t/RACE_LEN*w,now=X(Math.min(G.t,RACE_LEN));
+  ctx.fillStyle='rgba(90,169,255,.85)';
+  G.wxHist.forEach(s=>{if(s.r>0.03){const hh=Math.max(3,s.r*h*0.8);ctx.fillRect(X(s.t),h-hh,Math.max(1,X(300)),hh);}});
+  G.flagHist.forEach(f=>{const a=X(f.from),b=X(f.to==null?G.t:f.to);ctx.fillStyle=f.type==='slow'?'rgba(255,210,63,.45)':'#ffd23f';ctx.fillRect(a,0,Math.max(1.5,b-a),f.type==='sc'?6:4);});
+  ctx.fillStyle='rgba(9,14,26,.55)';ctx.fillRect(now,0,w-now,h);
+  ctx.fillStyle='#ffb547';ctx.fillRect(now-1,0,2,h);
+}
+function flagLabel(){
+  if(G.chequer&&G.winnerIdx>=0)return '方格旗';
+  return {green:'綠旗',slow:'慢速區',fcy:'FCY 黃旗',sc:'安全車'}[G.flag.type];
+}
+function gapStr(front,back){
+  const dl=dist(front)-(front.penLaps||0)-(dist(back)-(back.penLaps||0));
+  if(dl>=1)return `${Math.floor(dl)} 圈`;
+  return (Math.max(0,dl)*lapRef(back)).toFixed(1)+'s';
+}
+function buildCarsDom(){
+  const g=$('#cars');g.innerHTML='';
+  const ns='http://www.w3.org/2000/svg';
+  const list=G.cars.slice().sort((a,b)=>(a.isPlayer?1:0)-(b.isPlayer?1:0));
+  list.forEach(c=>{
+    const el=document.createElementNS(ns,'g');el.setAttribute('class','car'+(c.isPlayer?' me':''));el.id='car'+c.idx;
+    let html='';
+    if(c.isPlayer)html+='<circle class="ring" r="11.5"></circle>';
+    html+=`<circle class="dot" r="${c.isPlayer?8:6.2}" fill="${c.color}"></circle><text y="0.3">${c.num}</text><title>#${c.num} ${esc(c.team)}</title>`;
+    el.innerHTML=html;g.appendChild(el);
+  });
+}
+function renderCars(){
+  G.cars.forEach(c=>{
+    const el=document.getElementById('car'+c.idx);if(!el)return;
+    if(c.state==='dnf'||c.state==='done'){el.setAttribute('display','none');return;}
+    el.removeAttribute('display');
+    const p=c.state==='pit'?PIT_SLOTS[c.idx%PIT_SLOTS.length]:TRACK.at(c.prog);
+    el.setAttribute('transform',`translate(${p[0].toFixed(1)} ${p[1].toFixed(1)})`);
+    const cls='car'+(c.isPlayer?' me':'')+(c.state==='limp'?' limp':'')+(c.isPlayer&&c.boxCall?' boxing':'');
+    if(el.getAttribute('class')!==cls)el.setAttribute('class',cls);
+  });
+}
+function renderMap(){
+  const svg=$('#map'),e=G.env;
+  svg.dataset.f=G.flag.type;
+  $('#nightOv').setAttribute('opacity',((1-e.light)*0.42).toFixed(2));
+  $('#rainOv').setAttribute('opacity',(e.rain*0.55).toFixed(2));
+  svg.classList.toggle('dark',e.light<0.4);
+  const sz=$('#slowZone');
+  if(G.flag.type==='slow'){
+    const z=ZONES[G.flag.zone],pts=[];
+    for(let k=-34;k<=34;k+=2){const p=TRACK.pts[(z.idx+k+TRACK.N)%TRACK.N];pts.push(p[0].toFixed(1)+','+p[1].toFixed(1));}
+    sz.setAttribute('points',pts.join(' '));sz.style.display='';
+  }else sz.style.display='none';
+  $('#mapInfo').textContent=G.flag.type==='slow'?`慢速區：${ZONES[G.flag.zone].name}`:e.light<0.4?'夜間 · 頭燈全開':'13.626 km · 順時針';
+}
+function renderHeader(){
+  $('#cRemain').textContent=fmtHMS(RACE_LEN-G.t);
+  $('#cTod').textContent=`${(START_TOD+G.t)>=86400?'週日':'週六'} ${todStr(G.t)}`;
+  $('#cElapsed').textContent=fmtHM(G.t);
+  const fc=$('#flagChip');const fl=G.chequer&&G.winnerIdx>=0?'chequer':G.flag.type;
+  fc.dataset.f=fl;fc.textContent=flagLabel()+(G.flag.type!=='green'&&!G.chequer?' '+fmtMS(G.flag.until-G.t):'');
+  $('#btnPause').setAttribute('aria-pressed',String(G.paused));
+  document.querySelectorAll('#speedSeg [data-s]').forEach(b=>b.setAttribute('aria-pressed',String(!G.paused&&+b.dataset.s===G.speed)));
+}
+function todStr(t){const x=(((START_TOD+t)%86400)+86400)%86400;return `${pad(Math.floor(x/3600))}:${pad(Math.floor(x%3600/60))}`;}
+function setBar(id,frac,color){const el=$(id);el.style.width=(clamp(frac,0,1)*100).toFixed(1)+'%';if(color)el.style.background=color;}
+function renderConsole(){
+  const c=me(),e=G.env,pos=posOf(c);
+  $('#pPos').textContent='P'+pos;
+  $('#pTeam').textContent=c.team;
+  const pn=$('#pNum');pn.textContent=c.num;pn.style.setProperty('--cc',c.color);
+  $('#pLap').textContent=c.lap;
+  const oi=G.order.indexOf(c.idx);
+  const A=oi>0?G.cars[G.order[oi-1]]:null,B=G.cars[G.order[oi+1]];
+  const parts=[];
+  if(A)parts.push(`前 #${A.num} <b>+${gapStr(A,c)}</b>`);else parts.push('<b>領先全場</b>');
+  if(B&&B.state!=='dnf')parts.push(`後 #${B.num} <b>−${gapStr(c,B)}</b>`);
+  $('#pGaps').innerHTML=parts.join(' · ');
+  $('#tLast').textContent=fmtLap(c.lastLap);
+  $('#tBest').textContent=fmtLap(c.best);
+  $('#tFast').textContent=G.fastest.t<NONE?`${fmtLap(G.fastest.t)} #${G.fastest.num}`:'—';
+  // status pills
+  const pills=[];
+  if(c.state==='pit')pills.push(`<span class="pill warn">維修站內 · ${c.hold?'等待指示':Math.ceil(c.pitTimer)+'s'}</span>`);
+  else if(c.state==='limp')pills.push(`<span class="pill bad">慢駛返站 · ${{fuel:'冇油',punct:'爆胎',damage:'車損',mech:'機械故障'}[c.limpWhy]}</span>`);
+  else if(c.state==='done')pills.push('<span class="pill ok">已完賽</span>');
+  else if(c.state==='dnf')pills.push(`<span class="pill bad">退出：${esc(c.dnfWhy)}</span>`);
+  else if(c.delay>0)pills.push('<span class="pill warn">蝕緊時間（打滑 / 被阻）</span>');
+  else pills.push(`<span class="pill">賽道上 · 本圈預計 ${fmtLap(c.curLT)}</span>`);
+  if(c.penalty)pills.push(`<span class="pill bad">待執行 Stop & Go ${c.penalty}s</span>`);
+  if(c.issue)pills.push(`<span class="pill bad">${c.issue.label}</span>`);
+  if(c.punct)pills.push('<span class="pill bad">爆胎</span>');
+  $('#pStatus').innerHTML=pills.join('');
+  // fuel
+  const fpl=fuelPerLap(c),laps=c.fuel/fpl;
+  $('#gFuelV').textContent=Math.round(c.fuel*100)+'%';
+  setBar('#gFuelB',c.fuel,laps<1.5?'var(--stop)':laps<3?'var(--caution)':'var(--go)');
+  $('#gFuelBar').style.setProperty('--lap',(fpl*100).toFixed(2)+'%');
+  $('#gFuelS').textContent=`≈ ${laps.toFixed(1)} 圈 · 每格一圈 · ${(fpl*100).toFixed(1)}%/圈`;
+  // tyres
+  const tc=$('#gTyreC');tc.className='ty ty-'+c.tyre.c;tc.textContent=c.tyre.c;
+  $('#gTyreV').textContent=Math.round(c.tyre.wear*100)+'%';
+  setBar('#gTyreB',c.tyre.wear,c.tyre.wear>0.85?'var(--stop)':c.tyre.wear>0.65?'var(--caution)':'var(--ink-2)');
+  $('#gTyreS').textContent=`${TYRES[c.tyre.c].name} · ${c.tyre.laps} 圈 · ${(wearPerLap(c,c.tyre.c,e)*100).toFixed(1)}%/圈`;
+  // brakes, body
+  $('#gBrakeV').textContent=Math.round(c.brakes*100)+'%';
+  setBar('#gBrakeB',c.brakes,c.brakes<0.25?'var(--stop)':c.brakes<0.45?'var(--caution)':'var(--go)');
+  $('#gBrakeS').textContent=c.brakes<0.35?`每圈慢 ${((0.35-c.brakes)*14).toFixed(1)}s，考慮更換`:c.brakes<0.6?'磨損中':'碟片狀態良好';
+  $('#gBodyV').textContent=Math.round(c.damage*100)+'%';
+  setBar('#gBodyB',c.damage,c.damage>0.5?'var(--stop)':'var(--caution)');
+  $('#gBodyS').textContent=c.damage>0.01?`每圈慢 ${(c.damage*12).toFixed(1)}s`:'無損傷';
+  // tyre allocation
+  const sd=c.sets,bar=(n,max,cls)=>`<span class="sets ${cls}">${Array.from({length:max},(_,i)=>`<i${i<n?' class="on"':''}></i>`).join('')}</span>`;
+  const stintsLeft=Math.max(0,(RACE_LEN-G.t)/((1/fpl)*(c.refLT||210)));
+  $('#alloc').innerHTML=`<span class="g-lab">輪胎配額</span>${bar(sd.dry,TYRE_ALLOC.dry,'dry')}<b>乾 ${sd.dry}</b>${bar(sd.wet,TYRE_ALLOC.wet,'wet')}<b>雨 ${sd.wet}</b><span class="${sd.dry&&stintsLeft/sd.dry>2.2?'warn':''}">仲有約 ${Math.ceil(stintsLeft)} 節</span>`;
+  // crew
+  $('#crew').innerHTML=c.drivers.map((d,i)=>{
+    const on=i===c.di,f=d.fatigue;
+    const fc=f>0.7?'var(--stop)':f>0.45?'var(--caution)':'var(--go)';
+    return `<div class="crew-row${on?' on':''}"><b>${d.tag}</b><span class="nm">${on?(c.state==='pit'?'維修站':'駕駛中 '+fmtHM(d.stint)+' / 4:00'):esc(d.name)}<span class="grade">${d.grade}</span></span><span>${fmtHM(d.total)}<span class="minbar"><i class="${d.total>=MIN_TOTAL?'done':''}" style="width:${Math.min(100,d.total/MAX_TOTAL*100)}%"></i></span></span><span class="fat" title="疲勞 ${Math.round(f*100)}%"><i style="width:${Math.round(f*100)}%;background:${fc}"></i></span></div>`;
+  }).join('');
+  document.querySelectorAll('#modeSeg button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mode===c.mode)));
+  // box
+  const bb=$('#btnBox');
+  const canBox=c.state==='run'||c.state==='limp';
+  bb.disabled=!canBox||(G.chequer&&G.winnerIdx>=0);
+  bb.setAttribute('aria-pressed',String(c.boxCall||c.state==='limp'));
+  const eta=(1-c.prog)*c.curLT+c.delay;
+  if(c.state==='pit'){$('#boxTxt').innerHTML=`維修站內<small>${c.hold?'等待指示':'出站倒數 '+Math.ceil(c.pitTimer)+'s'}</small>`;}
+  else if(c.boxCall||c.state==='limp'){$('#boxTxt').innerHTML=`本圈尾入站<small>約 ${fmtMS(eta)} 後到達 · 再按取消</small>`;}
+  else $('#boxTxt').innerHTML=`呼叫入站<small>距維修站約 ${fmtMS(eta)}</small>`;
+}
+function renderTower(){
+  const rows=$('#ttBody').children;const L=G.cars[G.order[0]];
+  G.order.forEach((ci,k)=>{
+    const c=G.cars[ci],r=rows[k];if(!r)return;const td=r.children;
+    const fl=FLASH[c.idx],fc=fl&&fl.until>performance.now()?(fl.up?' fl-up':' fl-dn'):'';
+    r.className=(c.isPlayer?'me ':'')+(c.state==='dnf'?'dnf':'')+fc;
+    td[0].textContent=k+1;
+    const cn=td[1].firstChild;cn.textContent=c.num;cn.style.setProperty('--cc',c.color);
+    td[2].innerHTML=`<span class="mkb" style="${teamChip(c)}">${c.ab||''}</span>${esc(c.team)}`;
+    td[3].textContent=c.lap;
+    const dnf=c.state==='dnf';
+    td[4].textContent=dnf?'—':k===0?'領先':gapStr(L,c);
+    td[5].textContent=dnf?'—':k===0?'—':gapStr(G.cars[G.order[k-1]],c);
+    td[6].textContent=fmtLap(c.lastLap);
+    td[7].innerHTML=`<span class="c-ty"><span class="ty ty-${c.tyre.c}">${c.tyre.c}</span><span class="tyl">${c.tyre.laps}</span></span>`;
+    td[8].textContent=c.stops;
+    let st='';
+    if(c.state==='pit')st=`<span class="st st-pit">PIT ${c.hold?'':Math.ceil(c.pitTimer)}</span>`;
+    else if(c.state==='limp')st='<span class="st st-bad">慢駛</span>';
+    else if(dnf)st='<span class="st st-dnf">DNF</span>';
+    else if(c.state==='done')st='<span class="st st-fin">完賽</span>';
+    else if(c.delay>0)st='<span class="st st-spin">打滑</span>';
+    td[9].innerHTML=st;
+  });
+  $('#towerInfo').textContent=`Hypercar · ${G.cars.length} 架`;
+  $('#fastFoot').innerHTML=G.fastest.t<NONE?`全場最快 <b>${fmtLap(G.fastest.t)}</b> #${G.fastest.num}`:'全場最快：—';
+  const sc=G.flagHist.filter(f=>f.type==='sc').length,fcy=G.flagHist.filter(f=>f.type==='fcy').length;
+  $('#flagFoot').textContent=`安全車 ${sc} 次 · FCY ${fcy} 次`;
+}
+function buildTower(){
+  const tb=$('#ttBody');tb.innerHTML='';
+  G.cars.forEach(()=>{const tr=document.createElement('tr');tr.innerHTML='<td class="c-p"></td><td><span class="numchip"></span></td><td class="c-t"></td><td class="num"></td><td class="num"></td><td class="num opt"></td><td class="num opt"></td><td></td><td class="num opt"></td><td></td>';tb.appendChild(tr);});
+}
+function renderRadar(){
+  const e=G.env;
+  const r=e.rain;
+  $('#wxNow').textContent=r<0.03?(e.light<0.4?'夜間 · 無雨':(e.sun>0.5?'晴朗':'多雲')):r<0.3?'小雨':r<0.65?'中雨':'大雨';
+  $('#wxAir').textContent=Math.round(e.air)+'°';
+  $('#wxTrack').textContent=Math.round(e.track)+'°';
+  $('#wxClock').textContent=todStr(G.t);
+  $('#wxWetV').textContent=Math.round(e.wet*100)+'%';
+  setBar('#wxWetB',e.wet);
+  $('#wxWetS').textContent=e.wet<0.12?'乾地，用光頭胎':e.wet<0.2?'微濕，光頭胎仲頂得住':e.wet<0.35?'交界：雨胎開始較快':'濕地，要用雨胎';
+  const f=forecast();
+  const el=$('#fc');
+  if(!el.children.length)el.innerHTML=FC_H.map(()=>'<div class="fc-col"><div class="fc-bar"><i></i></div><div class="fc-p"></div><div class="fc-h"></div></div>').join('');
+  f.forEach((x,i)=>{
+    const col=el.children[i];
+    const bar=col.querySelector('i');bar.style.height=(x.p*100).toFixed(0)+'%';bar.style.opacity=(0.35+0.65*Math.max(x.inten,x.p>0.5?0.4:0)).toFixed(2);
+    col.querySelector('.fc-p').textContent=Math.round(x.p*100)+'%';
+    col.querySelector('.fc-h').textContent=`+${x.h}′`;
+  });
+}
+function renderLog(){
+  if(!G.logDirty)return;G.logDirty=false;
+  $('#log').innerHTML=G.log.slice(0,60).map(m=>`<li class="k-${m.kind}"><time>${todStr(m.t)}</time><span><b>${esc(m.from)}</b>${esc(m.text)}</span></li>`).join('');
+}
+let callKey=null;
+function renderCall(){
+  const el=$('#call'),call=G&&G.running&&!G.mini?G.call:null;
+  if(!call){el.hidden=true;callKey=null;return;}
+  const k=call.type+':'+call.title+':'+call.text;
+  if(k!==callKey){
+    callKey=k;
+    $('#callTag').textContent=call.tag;$('#callTitle').textContent=call.title;$('#callText').textContent=call.text;
+    $('#callOpts').innerHTML=call.opts.map((o,i)=>`<button type="button" class="copt${i===call.def?' def':''}" data-i="${i}"><kbd>${i+1}</kbd><b>${esc(o.label)}</b><span>${esc(o.hint)}</span></button>`).join('');
+  }
+  el.hidden=false;
+}
+function renderToast(){
+  const show=G.running&&G.paused&&!G.modal&&!G.mini;
+  $('#toast').hidden=!show;
+  $('#toast').style.bottom=G.call&&show?`calc(${$('#call').offsetHeight+28}px + env(safe-area-inset-bottom,0px))`:'';
+  if(show)$('#toastTxt').textContent=G.pauseMsg?`已暫停：${G.pauseMsg}`:'已暫停';
+}
+let skyTick=0;
+function renderSlow(){
+  if(!G)return;
+  renderHeader();renderMap();renderConsole();renderTower();renderRadar();renderLog();renderCall();renderToast();
+  if(++skyTick%5===0){drawSky();renderGuide();}
+}
+
+/* ---------- overtake effects on the page ---------- */
+function uiOvertake(ev,main){
+  const c=me(),now=performance.now(),up=ev.type!=='passed';
+  FLASH[c.idx]={until:now+1500,up};FLASH[ev.rival]={until:now+1500,up:!up};
+  const pp=$('#pPos');pp.classList.remove('bump-up','bump-dn');void pp.offsetWidth;pp.classList.add(up?'bump-up':'bump-dn');
+  if(c.state!=='pit'){
+    const p=TRACK.at(c.prog),g=document.createElementNS('http://www.w3.org/2000/svg','g'),k=up?'up':'dn';
+    g.setAttribute('transform',`translate(${p[0].toFixed(1)} ${p[1].toFixed(1)})`);
+    g.innerHTML=`<circle class="burst ${k}" r="7"></circle><circle class="burst ${k} b2" r="7"></circle><text class="burst-t ${k}" y="-15">${up?'▲':'▼'} P${ev.pos}</text>`;
+    $('#fx').appendChild(g);setTimeout(()=>g.remove(),1300);
+  }
+  if(main)STAGE.overtake(ev);
+}
+
+/* ---------- drivers x tyres guide ---------- */
+const KS=['S','M','H','W'];
+const TRAITS=[['速度',d=>(d.skill-0.85)/0.14],['雨戰',d=>(d.rain-0.8)/0.2],['慳胎',d=>(1.12-d.tyre)/0.25],['耐力',d=>(d.stamina-0.9)/0.3],['穩定',d=>(d.cons-0.85)/0.3]];
+function pipsHtml(v){const n=clamp(Math.round(v*5),1,5);let s='';for(let i=0;i<5;i++)s+=`<i${i<n?' class="on"':''}></i>`;return `<span class="pips" role="img" aria-label="${n} / 5">${s}</span>`;}
+// total time for `laps` laps on one set of tyres, refuelling every L laps
+function stintSum(c,d,k,laps,L){
+  const e=G.env,r=wearPerLap(c,k,e,d),fpl=fuelPerLap(c);let s=0;
+  for(let i=0;i<laps;i++)s+=estLap(c,d,k,(i+0.5)*r,Math.max(0,1-((i%L)+0.5)*fpl));
+  return s;
+}
+// per compound: fresh pace, wear, and the best number of stints per set once the tyre change is paid for
+function tyreStudy(c){
+  const e=G.env,d=c.drivers[c.di],L=Math.max(1,Math.floor(1/fuelPerLap(c))),R={};
+  const remStints=Math.max(1,(RACE_LEN-G.t)/(L*(c.refLT||210)));
+  KS.forEach(k=>{
+    const r=wearPerLap(c,k,e,d),left=c.sets[setKey(k)];
+    // with a limited allocation every dry set has to cover a share of the remaining stints
+    const nMin=k==='W'?1:Math.min(4,Math.max(1,Math.ceil(remStints/Math.max(1,left))));
+    let best=null;
+    for(const n of[1,2,3,4]){if(n<nMin||(n>nMin&&r*n*L>1.02))continue;const per=(stintSum(c,d,k,n*L,L)+TYRE_TIME)/(n*L);if(!best||per<best.per)best={n,per};}
+    if(left<=0)best={n:best.n,per:Infinity};
+    R[k]={fresh:tyreDelta({c:k,wear:0},e),rate:r,life:Math.floor(0.85/r),avg:stintSum(c,d,k,L,L)/L,best,left};
+  });
+  const ord=KS.slice().sort((a,b)=>R[a].best.per-R[b].best.per);
+  return {R,L,rec:ord[0],sec:ord[1],remStints};
+}
+function tyreWhy(st,e){
+  const {R,L,rec,sec}=st,r=R[rec],t=Math.round(e.track),pc=x=>(x*100).toFixed(1)+'%';
+  let why;
+  if(rec==='W')why=`賽道濕度 ${Math.round(e.wet*100)}%，光頭胎每圈慢 ${(Math.min(R.S.fresh,R.M.fresh,R.H.fresh)-R.W.fresh).toFixed(1)}s，仲好易失控。`;
+  else if(e.wet>=0.12)why=`微濕但未到換雨胎（大約 20% 濕度先值得換），雨胎而家仲慢 ${(R.W.fresh-r.fresh).toFixed(1)}s。`;
+  else if(rec==='S')why=`${t}°C 夠涼，軟胎每圈只磨 ${pc(R.S.rate)}，一套可以跑 ${r.best.n} 節。`;
+  else if(rec==='H')why=`${t}°C 好熱，硬胎每圈只磨 ${pc(R.H.rate)}，一套跑 ${r.best.n} 節，慳返換胎時間。`;
+  else why=R.S.rate*L>0.55?`軟胎喺 ${t}°C 每圈磨 ${pc(R.S.rate)}，跑完一節已經 ${Math.round(R.S.rate*L*100)}%；中性胎耐用得多。`:`${t}°C 之下，中性胎速度同耐用度最平均。`;
+  if((rec==='S'||rec==='M')&&e.track<22&&e.wet<0.12)why+=` 硬胎低溫唔夠熱，新胎都慢 ${(R.H.fresh-r.fresh).toFixed(1)}s。`;
+  return why+(isFinite(R[sec].best.per)?` 計埋換胎時間，平均每圈比${TYRES[sec].name}快 ${(R[sec].best.per-r.best.per).toFixed(2)}s。`:'');
+}
+function renderGuide(){
+  if(!G||!G.cars.length)return;
+  const c=me(),e=G.env,st=tyreStudy(c),{R,L,rec}=st,cur=c.drivers[c.di];
+  const fMin=Math.min(...KS.map(k=>R[k].fresh));
+  const cond=`${e.wet<0.12?'乾地':e.wet<0.2?'微濕':e.wet<0.35?'半濕':'濕地'} · 賽道 ${Math.round(e.track)}°C · ${e.light<0.4?'夜間':e.light<0.95?'黃昏 / 清晨':'日間'}`;
+  const f=forecast();let warn='';
+  if(e.wet<0.15){const m=f.slice(0,3).reduce((a,b)=>b.p>a.p?b:a);if(m.p>0.6)warn=`雷達：大約 ${m.h} 分鐘內有 ${Math.round(m.p*100)}% 機會落雨，雨胎要準備好。`;}
+  else if(f[1].p<0.25&&f[2].p<0.25)warn='雷達：雨就快停，條線乾返就要轉光頭胎。';
+  const plan=!isFinite(R[rec].best.per)?'配額用晒，只可以繼續用而家呢套':`${TYRES[rec].name} · ${R[rec].best.n>1?`一套跑 ${R[rec].best.n} 節`:'每節換新胎'}`;
+  const allocLine=`輪胎配額：乾胎剩 ${c.sets.dry} 套、雨胎剩 ${c.sets.wet} 套 · 仲有大約 ${Math.ceil(st.remStints)} 節，乾胎平均每套要跑 ${(st.remStints/Math.max(1,c.sets.dry)).toFixed(1)} 節`;
+  $('#gTip').innerHTML=`<div class="tip"><span class="ty ty-${rec}">${rec}</span><div><span class="lbl-s">而家最啱用（${cur.tag} 揸）</span><b>${plan}</b><div class="tip-cond">${cond} · ${c.tyre.c===rec?'你而家用緊呢款':`你而家用緊${TYRES[c.tyre.c].name}`}</div><div class="tip-cond">${allocLine}</div><p>${tyreWhy(st,e)}</p></div></div>${warn?`<p class="tip-warn">${warn}</p>`:''}`;
+  const head=`<thead><tr><th></th>${KS.map(k=>`<th class="${k===rec?'cpick':''}"><span class="ty ty-${k}">${k}</span><small>${k===c.tyre.c?'用緊':TYRES[k].name}</small></th>`).join('')}</tr></thead>`;
+  const rows=[
+    ['新胎單圈',k=>R[k].fresh-fMin<0.05?'最快':'+'+(R[k].fresh-fMin).toFixed(1)+'s'],
+    ['每圈磨損',k=>(R[k].rate*100).toFixed(1)+'%'],
+    ['磨到 85%',k=>R[k].life>99?'99+ 圈':R[k].life+' 圈'],
+    [`一節平均 ${cur.tag}`,k=>fmtLap1(R[k].avg)],
+    ['一套跑幾節',k=>R[k].best.n+' 節'],
+    ['剩餘配額',k=>R[k].left>0?R[k].left+' 套':'冇'],
+  ];
+  $('#gComp').innerHTML=head+'<tbody>'+rows.map(([l,fn])=>`<tr><th>${l}</th>${KS.map(k=>`<td class="${k===rec?'cpick':''}">${fn(k)}</td>`).join('')}</tr>`).join('')+'</tbody>';
+  const times=c.drivers.map(d=>KS.map(k=>stintSum(c,d,k,L,L)/L));
+  const colBest=KS.map((k,j)=>Math.min(...times.map(t=>t[j])));
+  $('#gDrv').innerHTML=c.drivers.map((d,i)=>{
+    const t=times[i],rowBest=Math.min(...t),on=i===c.di;
+    const status=on?(c.state==='pit'?'喺維修站':'駕駛中 '+fmtHM(d.stint)):'休息中';
+    const note=d.note||(DRIVERS.find(x=>x.tag===d.tag)||{}).note||'';
+    return `<div class="dcard${on?' on':''}"><div class="dc-h"><b>${d.tag}</b><span class="nm">${esc(d.name)} · ${d.grade}</span><em>${status} · 疲勞 ${Math.round(d.fatigue*100)}% · 已揸 ${fmtHM(d.total)}</em></div>`+
+      `<div class="traits">${TRAITS.map(([l,fn])=>`<span>${l}${pipsHtml(fn(d))}</span>`).join('')}</div>`+
+      `<div class="dc-t">${KS.map((k,j)=>`<span class="${t[j]===rowBest?'best':''}"><span class="ty ty-${k}">${k}</span>${fmtLap1(t[j])}${t[j]===colBest[j]?'<i class="star" title="呢款胎最快嘅車手">★</i>':''}</span>`).join('')}</div>`+
+      `<p class="dc-note">${note}</p></div>`;
+  }).join('');
+}
+
+/* ================= end of race ================= */
+function endRace(){
+  if(G.ended)return;
+  G.ended=true;G.running=false;G.paused=true;G.endSoon=false;
+  const c=me();
+  const short=c.drivers.filter(d=>d.total<MIN_TOTAL);
+  c.penLaps=short.length*5;
+  if(short.length)radio('賽事',`${short.map(d=>d.tag).join('、')} 未達 6 小時最低駕駛時間，罰 ${c.penLaps} 圈。`,'bad');
+  const fin=G.cars.slice().sort(cmpCars);
+  G.result={order:fin.map(x=>x.idx)};
+  const pos=G.result.order.indexOf(c.idx)+1;
+  try{const k='pitwall24-best';const b=JSON.parse(localStorage.getItem(k)||'{}');if(c.state!=='dnf'&&(!b[G.opt.diff]||pos<b[G.opt.diff])){b[G.opt.diff]=pos;localStorage.setItem(k,JSON.stringify(b));}}catch(err){}
+  showEnd();
+}
+function showEnd(){
+  const c=me(),order=G.result.order.map(i=>G.cars[i]);
+  const pos=order.indexOf(c)+1,W=order[0];
+  $('#endPos').textContent=c.state==='dnf'?'DNF':'P'+pos;
+  $('#endTitle').textContent=c.state==='dnf'?'今年嘅 24 小時提早完結':pos===1?'Le Mans 冠軍！':pos<=3?'登上頒獎台！':'完成 24 小時';
+  $('#endLine').textContent=c.state==='dnf'?`#${c.num} ${c.team} 喺第 ${c.lap} 圈退出（${c.dnfWhy}）。`:`#${c.num} ${c.team} 完成 ${c.lap-c.penLaps} 圈${c.penLaps?`（已扣罰 ${c.penLaps} 圈）`:''}，${pos===1?'贏得冠軍。':`落後冠軍 #${W.num} ${gapFinal(W,c)}。`}`;
+  $('#endTable').innerHTML=order.map((o,k)=>`<tr class="${o.isPlayer?'me':''}${o.state==='dnf'?' dnf':''}"><td class="c-p">${k+1}</td><td><span class="numchip" style="--cc:${o.color}">${o.num}</span></td><td class="c-t">${esc(o.team)}</td><td class="num">${o.lap-o.penLaps}</td><td class="num">${o.state==='dnf'?'DNF · '+esc(o.dnfWhy):k===0?'冠軍':gapFinal(W,o)}</td><td class="num">${o.stops}</td></tr>`).join('');
+  const inc=c.incidents;
+  $('#endStats').innerHTML=[
+    ['入站次數',c.stops],['維修站總時間',fmtMS(c.pitTime)],['個人最快',fmtLap(c.best)],
+    ['意外',inc],['爬頭 / 被爬',`${c.passes||0} / ${c.passedBy||0}`],['攻防成功',`${c.callWin||0} / ${c.callTry||0}`],
+    ['換胎完美',`${c.miniPerf||0} / ${c.miniN||0}`],['最快停站',c.fastStop?c.fastStop.toFixed(1)+'s':'—'],['工程師抉擇',G.callsMade||0]
+  ].map(([k,v])=>`<div><b>${v}</b><small>${k}</small></div>`).join('');
+  // position chart
+  const H=G.hist,n=G.cars.length,w=560,h=170,x0=28,y0=10,cw=w-x0-8,ch=h-y0-22;
+  const X=t=>x0+t/RACE_LEN*cw,Y=p=>y0+(p-1)/(n-1)*ch;
+  let svg=`<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="比賽期間名次走勢">`;
+  // night band
+  const nA=(22.5-16)*3600,nB=(29-16)*3600;svg+=`<rect class="night" x="${X(nA)}" y="${y0}" width="${X(nB)-X(nA)}" height="${ch}"></rect>`;
+  [...new Set([1,Math.round(n/3),Math.round(2*n/3),n])].forEach(p=>{svg+=`<line class="gl" x1="${x0}" x2="${x0+cw}" y1="${Y(p)}" y2="${Y(p)}"></line><text class="ax" x="${x0-6}" y="${Y(p)+3}" text-anchor="end">P${p}</text>`;});
+  [0,6,12,18,24].forEach(hh=>{svg+=`<text class="ax" x="${X(hh*3600)}" y="${h-6}" text-anchor="middle">${hh}h</text>`;});
+  if(H.length>1){svg+=`<polyline class="ln" points="${H.map(s=>X(s.t).toFixed(1)+','+Y(s.pos).toFixed(1)).join(' ')}"></polyline>`;const l=H[H.length-1];svg+=`<circle cx="${X(l.t)}" cy="${Y(l.pos)}" r="3.5" fill="var(--sodium)"></circle>`;}
+  svg+='</svg>';
+  $('#endChart').innerHTML=svg;
+  $('#endDrivers').innerHTML=c.drivers.map(d=>`<div class="${d.total<MIN_TOTAL?'bad':''}"><span>${d.tag} · ${esc(d.name)}</span><span>${fmtHM(d.total)} ${d.total>=MIN_TOTAL?'✓':'（未達 6h）'}</span></div>`).join('');
+  $('#endOv').hidden=false;$('#pitOv').hidden=true;$('#toast').hidden=true;
+  renderSlow();
+}
+function gapFinal(W,o){
+  const dl=(W.lap-W.penLaps)-(o.lap-o.penLaps);
+  if(dl>=1)return `+${dl} 圈`;
+  if(o.finishT!=null&&W.finishT!=null)return '+'+(o.finishT-W.finishT).toFixed(1)+'s';
+  return `+${Math.max(0,dist(W)-dist(o)).toFixed(2)} 圈`;
+}
+
+/* ================= UI wiring ================= */
+function setupRaceUI(){
+  buildCarsDom();buildTower();
+  $('#startOv').hidden=true;$('#endOv').hidden=true;$('#pitOv').hidden=G.modal!=='pit';
+  $('#optGuard').checked=G.opt.guard;$('#optDialog').checked=G.opt.dialog;$('#optAutoPause').checked=G.opt.autoPause;$('#optPitCam').checked=G.opt.pitCam!==false;$('#optMini').checked=G.opt.mini!==false;
+  skyBase=null;drawSky();renderSlow();renderGuide();renderCars();renderMini();
+}
+function renderTeamList(){
+  const el=$('#teamList');if(!el)return;
+  el.innerHTML=TEAM_OPTS.map((t,i)=>`<button type="button" class="trow" data-i="${i}" aria-pressed="${i===START.team}"><span class="tnum" style="${teamChip(t)}">${esc(t.num)}</span><span class="tname"><b>${t.custom?'自訂車隊（虛構）':esc(t.team)}</b><small>${esc(t.mk)} ${esc(t.car)} · ${esc(t.res)}</small></span><span class="tstat"><span>速度</span>${pipsHtml((208.05-t.pace)/1.15)}<span>可靠</span>${pipsHtml((1.55-t.rel)/0.75)}<span>維修</span>${pipsHtml((1.06-t.crew)/0.11)}</span></button>`).join('');
+  const t=pickedTeam();
+  $('#customWrap').hidden=!t.custom;
+  $('#teamNote').textContent=t.custom?'虛構車隊，性能定喺中游。':`#${t.num} ${t.team} · ${t.mk} ${t.car} · ${t.res} · 2026 排位第 ${t.q}`;
+  $('#startForm .go').textContent=`綠旗 · 以 #${t.num} 出賽`;
+}
+function showStart(){
+  renderTeamList();
+  $('#startOv').hidden=false;$('#endOv').hidden=true;$('#pitOv').hidden=true;$('#toast').hidden=true;$('#mini').hidden=true;$('#call').hidden=true;
+  try{const b=JSON.parse(localStorage.getItem('pitwall24-best')||'{}');const names={easy:'輕鬆',normal:'標準',hard:'困難'};const s=Object.keys(names).filter(k=>b[k]).map(k=>`${names[k]} P${b[k]}`);$('#bestLine').textContent=s.length?`最佳成績：${s.join(' · ')}`:'';}catch(err){}
+  setTimeout(()=>$('#startForm .go').focus(),30);
+}
+function togglePause(){if(!G||!G.running||G.modal)return;G.paused=!G.paused;if(!G.paused)G.pauseMsg='';renderSlow();}
+function toggleBox(){
+  if(!G||!G.running)return;const c=me();
+  if(c.state!=='run'||(G.chequer&&G.winnerIdx>=0))return;
+  c.boxCall=!c.boxCall;
+  if(c.boxCall)radio('工程師','Box, box！本圈尾入站。','team');
+  renderSlow();
+}
+function setMode(m){if(!G||!G.running)return;const c=me();if(c.mode===m)return;c.mode=m;c.tmode=null;radio('工程師',`引擎轉${MODES[m].name}模式。`,'team');renderSlow();}
+function bindUI(){
+  document.querySelectorAll('#startForm .seg[data-opt], #startForm .pickers[data-opt]').forEach(g=>{
+    g.addEventListener('click',ev=>{
+      const b=ev.target.closest('button[data-val]');if(!b)return;
+      const k=g.dataset.opt;START[k]=k==='driver'?+b.dataset.val:b.dataset.val;
+      g.querySelectorAll('button[data-val]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
+    });
+  });
+  $('#startForm').addEventListener('submit',ev=>{ev.preventDefault();newGame();});
+  $('#teamList').addEventListener('click',e=>{const b=e.target.closest('.trow');if(!b)return;START.team=+b.dataset.i;renderTeamList();});
+  $('#btnPause').addEventListener('click',togglePause);
+  document.querySelectorAll('#speedSeg [data-s]').forEach(b=>b.addEventListener('click',()=>{if(!G||!G.running)return;G.speed=+b.dataset.s;if(!G.modal){G.paused=false;G.pauseMsg='';}renderSlow();}));
+  $('#toastGo').addEventListener('click',togglePause);
+  $('#btnBox').addEventListener('click',toggleBox);
+  document.querySelectorAll('#modeSeg button').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.mode)));
+  $('#optGuard').addEventListener('change',e=>{if(G)G.opt.guard=e.target.checked;});
+  $('#optDialog').addEventListener('change',e=>{if(G)G.opt.dialog=e.target.checked;});
+  $('#optAutoPause').addEventListener('change',e=>{if(G)G.opt.autoPause=e.target.checked;});
+  $('#optPitCam').addEventListener('change',e=>{if(G)G.opt.pitCam=e.target.checked;});
+  $('#optMini').addEventListener('change',e=>{if(G)G.opt.mini=e.target.checked;});
+  $('#miniHit').addEventListener('pointerdown',e=>{e.preventDefault();miniHit();});
+  $('#mTrack').addEventListener('pointerdown',e=>{e.preventDefault();miniHit();});
+  $('#miniHit').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();}});
+  $('#pcSkip').addEventListener('click',()=>{if(G)G.pitSkip=true;STAGE.hud();});
+  let quitArm=0;
+  $('#btnQuit').addEventListener('click',()=>{
+    const b=$('#btnQuit');
+    if(!G||G.ended||!G.running){if(G&&G.ended){G=null;}showStart();return;}
+    if(Date.now()-quitArm<3000){quitArm=0;b.textContent='退出';b.classList.remove('warn');G.running=false;G.modal=null;showStart();return;}
+    quitArm=Date.now();b.textContent='再按一次確認';b.classList.add('warn');
+    setTimeout(()=>{if(Date.now()-quitArm>=2900){b.textContent='退出';b.classList.remove('warn');}},3000);
+  });
+  $('#btnAgain').addEventListener('click',()=>{showStart();});
+  // pit dialog
+  $('#pmFuel').addEventListener('input',e=>{G.plan.fuel=(+e.target.value)/100;updatePitUI();});
+  document.querySelectorAll('[data-fuel]').forEach(b=>b.addEventListener('click',()=>{
+    const c=me(),mx=1-c.fuel;
+    G.plan.fuel={full:mx,end:fuelToEnd(c),half:Math.min(mx,0.5),none:0}[b.dataset.fuel];
+    $('#pmFuel').value=Math.round(G.plan.fuel*100);updatePitUI();
+  }));
+  $('#pmTyres').addEventListener('click',e=>{const b=e.target.closest('.tyopt');if(!b||b.disabled)return;G.plan.tyre=b.dataset.tyre==='keep'?null:b.dataset.tyre;updatePitUI();});
+  $('#pmDrivers').addEventListener('click',e=>{const b=e.target.closest('.drvopt');if(!b)return;G.plan.driver=+b.dataset.driver;updatePitUI();});
+  $('#pmBrakes').addEventListener('change',e=>{G.plan.brakes=e.target.checked;updatePitUI();});
+  $('#pmFix').addEventListener('change',e=>{G.plan.fix=e.target.checked;updatePitUI();});
+  $('#pmRepair').addEventListener('click',e=>{const b=e.target.closest('[data-rep]');if(!b||b.disabled)return;G.plan.repair=b.dataset.rep==='none'?null:b.dataset.rep;updatePitUI();});
+  $('#pmGo').addEventListener('click',commitPit);
+  $('#callOpts').addEventListener('click',e=>{const b=e.target.closest('.copt');if(b)chooseCall(+b.dataset.i);});
+  document.addEventListener('keydown',ev=>{
+    if(!G)return;
+    const tag=(ev.target.tagName||'').toLowerCase();
+    if(G.mini&&G.running){if(ev.key===' '||ev.key==='Enter'){ev.preventDefault();if(!ev.repeat)miniHit();}return;}
+    if(G.modal==='pit'){if(ev.key==='Enter'&&tag!=='button'){ev.preventDefault();commitPit();}return;}
+    if(tag==='input'||tag==='textarea'||tag==='select')return;
+    if(!G.running)return;
+    if(G.call&&/^[1-3]$/.test(ev.key)){ev.preventDefault();chooseCall(+ev.key-1);return;}
+    if(ev.key===' '){ev.preventDefault();togglePause();}
+    else if(ev.key==='b'||ev.key==='B'){toggleBox();}
+    else if(ev.key==='1')setMode('save');
+    else if(ev.key==='2')setMode('normal');
+    else if(ev.key==='3')setMode('push');
+  });
+  window.addEventListener('resize',()=>{skyBase=null;drawSky();});
+}
+function buildMap(){
+  $('#trkEdge').setAttribute('d',TRACK.d);$('#trkLine').setAttribute('d',TRACK.d);
+  const pl=[];for(let k=-30;k<=28;k+=2){const p=TRACK.offset(k,10);pl.push((pl.length?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1));}
+  const a=TRACK.offset(-34,0),d=TRACK.offset(32,0);
+  $('#pitLane').setAttribute('d',`M${a[0].toFixed(1)} ${a[1].toFixed(1)} ${pl.join(' ').replace(/^M/,'L')} L${d[0].toFixed(1)} ${d[1].toFixed(1)}`);
+  const s1=TRACK.offset(0,-7),s2=TRACK.offset(0,7);
+  const sf=$('#sfLine');sf.setAttribute('x1',s1[0]);sf.setAttribute('y1',s1[1]);sf.setAttribute('x2',s2[0]);sf.setAttribute('y2',s2[1]);
+  const L=[['Dunlop',184,44,'middle'],['Tertre Rouge',304,80,'start'],['Mulsanne',372,580,'middle'],['Indianapolis',240,505,'middle'],['Arnage',186,482,'end'],['Porsche Curves',156,300,'end'],['Ford',104,190,'end'],['S / F',86,138,'end'],['PIT',128,140,'start']];
+  let html=L.map(([t,x,y,an])=>`<text class="lbl" x="${x}" y="${y}" text-anchor="${an}">${t}</text>`).join('');
+  html+='<text class="lbl" transform="translate(352 230) rotate(78.7)" letter-spacing="3">Hunaudières</text>';
+  $('#labels').innerHTML=html;
+}
+
+/* ================= 3D stage: showcase turntable, pit cam, overtake cam ================= */
+const STAGE=(()=>{
+  const S={ok:false,mode:'show',yaw:-0.6,drag:null,lastTouch:-1e9,visible:true,spin:0,rspin:0,lolli:'',team:'',stripe:'',stepsKey:'',bg:'',sparkIdx:0,battle:null,camBase:null,camTgt:null,otTimer:0};
+  const reduced=!!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const TYRE_HEX={S:0xff5a5f,M:0xffd23f,H:0xe8edf7,W:0x5aa9ff};
+  const FONT='"Saira Condensed","PingFang TC","Noto Sans TC",sans-serif';
+  const sm=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
+  const lerp=(a,b,t)=>a+(b-a)*t;
+  const easeIO=t=>t<0.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+  const CREW_DEF=[
+    {role:'wheel',stand:[1.9,-2.7],work:[2.2,1.85]},
+    {role:'wheel',stand:[0.9,-2.7],work:[2.2,-1.85]},
+    {role:'wheel',stand:[-1.3,-2.7],work:[-0.9,1.85]},
+    {role:'wheel',stand:[-2.3,-2.7],work:[-0.9,-1.85]},
+    {role:'fuel',stand:[-0.3,-2.8],work:[-0.55,-1.3]},
+    {role:'jack',stand:[3.0,-2.6],work:[3.3,-0.1]},
+    {role:'jack',stand:[-3.2,-2.6],work:[-3.35,0.1]},
+    {role:'lolli',stand:[4.05,1.3],work:[4.05,1.3]},
+  ];
+  let R,scene,cam,car,rival,shadowG,showG,pitG,battleG,hemi,key,rim,paintMat,navyMat,rivalNavy,stripeMat,headMat,tailMat,floorMat,pitFloorMat,battleFloor,hose,driverFig,rain,sparks,streaks,glowTex,fadeTex;
+  let teamT,signT,lolliT,numT,n88T,rivalPaint,rivalStripe,rivalNum,rivalTeam,rainPos,sparkPos,sparkVel,sparkLife,streakPos;
+  const wheels=[],rivalSpins=[],glows=[],crew=[],scrollTex=[];
+  const stageEl=()=>document.getElementById('stage');
+  const col=h=>new THREE.Color(h).convertSRGBToLinear();
+
+  function ctex(w,h,paint){
+    const cv=document.createElement('canvas');cv.width=w;cv.height=h;const x=cv.getContext('2d');
+    const tex=new THREE.CanvasTexture(cv);tex.encoding=THREE.sRGBEncoding;tex.anisotropy=4;
+    const t={tex,draw(arg){x.setTransform(1,0,0,1,0,0);x.clearRect(0,0,w,h);paint(x,w,h,arg);tex.needsUpdate=true;}};
+    t.draw();return t;
+  }
+  function gradTex(stops,radial){
+    return ctex(256,256,(x,w,h)=>{const g=radial?x.createRadialGradient(w/2,h/2,0,w/2,h/2,w/2):x.createLinearGradient(0,0,w,0);stops.forEach(([o,c])=>g.addColorStop(o,c));x.fillStyle=g;x.fillRect(0,0,w,h);}).tex;
+  }
+  const shp=fn=>{const s=new THREE.Shape();fn(s);return s;};
+  function ext(shape,depth,bevel,mat,z){
+    const g=new THREE.ExtrudeGeometry(shape,{depth,bevelEnabled:bevel>0,bevelThickness:bevel,bevelSize:bevel,bevelSegments:4,curveSegments:32,steps:1});
+    g.translate(0,0,-depth/2);const m=new THREE.Mesh(g,mat);m.position.z=z||0;return m;
+  }
+  function bx(w,h,d,mat,x,y,z){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);return m;}
+  function pl(w,h,mat,x,y,z){const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),mat);m.position.set(x,y,z);return m;}
+  function flat(m){m.rotation.x=-Math.PI/2;return m;}
+  const decal=map=>new THREE.MeshStandardMaterial({map,transparent:true,roughness:0.35,metalness:0.1,polygonOffset:true,polygonOffsetFactor:-2});
+  const teamPaint=(x,w,h,a)=>{a=a||{};x.fillStyle=a.color||'#ffb547';x.font=`800 100px ${FONT}`;x.textAlign='center';x.textBaseline='middle';x.fillText(String(a.name||'Harbour Racing').toUpperCase(),w/2,h/2+6,w-40);};
+  const hx=v=>parseInt(String(v).slice(1),16);
+  const numPaint=(x,w,h,n)=>{n=String(n==null?'88':n);x.fillStyle='#f3efe4';x.beginPath();x.arc(w/2,h/2,120,0,Math.PI*2);x.fill();x.fillStyle='#16213d';x.font=`800 ${n.length>2?118:150}px ${FONT}`;x.textAlign='center';x.textBaseline='middle';x.fillText(n,w/2,h/2+10);};
+
+  // soft studio reflections: a dark dome with a few bright panels, prefiltered into an env map
+  function buildEnv(){
+    const es=new THREE.Scene();
+    es.add(new THREE.Mesh(new THREE.SphereGeometry(40,24,12),new THREE.MeshBasicMaterial({color:col(0x18213a),side:THREE.BackSide})));
+    const panel=(w,h,x,y,z,r,g,b)=>{const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({color:new THREE.Color(r,g,b),side:THREE.DoubleSide}));m.position.set(x,y,z);m.lookAt(0,0,0);es.add(m);};
+    panel(36,6,0,24,0.01,4,4,3.8);
+    panel(9,22,-26,7,10,2.2,2.3,2.6);
+    panel(9,16,24,6,-12,1.5,1.4,1.3);
+    panel(34,3,0,2,-28,1.8,0.9,0.35);
+    const pm=new THREE.PMREMGenerator(R);const tex=pm.fromScene(es,0.02).texture;pm.dispose();return tex;
+  }
+
+  /* ---------- the car: a Le Mans Hypercar built from extruded side profiles ---------- */
+  function wheel(side,x,rubber,rimM,paint){
+    const w=new THREE.Group();w.name='wheel';w.position.set(x,0.36,side*0.82);if(side<0)w.rotation.y=Math.PI;w.userData.dir=side;
+    const sp=new THREE.Group();sp.name='spin';w.add(sp);
+    const ty=new THREE.Mesh(new THREE.CylinderGeometry(0.36,0.36,0.32,40),rubber);ty.rotation.x=Math.PI/2;sp.add(ty);
+    const rm=new THREE.Mesh(new THREE.CylinderGeometry(0.235,0.235,0.326,28),rimM);rm.rotation.x=Math.PI/2;sp.add(rm);
+    for(let k=0;k<5;k++){const s=new THREE.Mesh(new THREE.BoxGeometry(0.055,0.2,0.02),rimM);s.geometry.translate(0,0.1,0);s.position.z=0.168;s.rotation.z=k*Math.PI*0.4;sp.add(s);}
+    const nut=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,0.04,12),paint);nut.rotation.x=Math.PI/2;nut.position.z=0.172;sp.add(nut);
+    const sm=new THREE.MeshBasicMaterial({color:col(0xffd23f)});
+    const st=new THREE.Mesh(new THREE.TorusGeometry(0.3,0.013,6,56),sm);st.name='stripe';st.position.z=0.161;sp.add(st);
+    return {w,sp,sm,k:'',off:0,bz:side*0.82,dir:side};
+  }
+  function buildCar(){
+    const g=new THREE.Group();
+    const paint=paintMat=new THREE.MeshPhysicalMaterial({color:col(0xffb547),metalness:0.2,roughness:0.28,clearcoat:1,clearcoatRoughness:0.05});
+    const navy=navyMat=new THREE.MeshPhysicalMaterial({color:col(0x17223f),metalness:0.3,roughness:0.3,clearcoat:0.8,clearcoatRoughness:0.08});
+    const carbon=new THREE.MeshStandardMaterial({color:col(0x14171e),metalness:0.35,roughness:0.45});
+    const glass=new THREE.MeshPhysicalMaterial({color:col(0x22355c),metalness:0.75,roughness:0.06,clearcoat:1});
+    const rubber=new THREE.MeshStandardMaterial({color:col(0x121317),roughness:0.88,metalness:0});
+    const rimM=new THREE.MeshStandardMaterial({color:col(0x2b313c),metalness:0.85,roughness:0.28});
+    headMat=new THREE.MeshStandardMaterial({color:col(0xfff4dc),emissive:col(0xffe2a6),emissiveIntensity:0.9});
+    tailMat=new THREE.MeshStandardMaterial({color:col(0x3a0608),emissive:col(0xff2a2a),emissiveIntensity:1.4});
+    // monocoque and sidepods
+    g.add(ext(shp(s=>{s.moveTo(2.42,0.1);s.quadraticCurveTo(2.64,0.14,2.58,0.27);s.quadraticCurveTo(2.0,0.42,1.2,0.5);s.lineTo(-1.2,0.6);s.quadraticCurveTo(-2.3,0.67,-2.52,0.58);s.lineTo(-2.52,0.14);s.lineTo(2.42,0.1);}),0.86,0.07,navy));
+    g.add(ext(shp(s=>{s.moveTo(1.1,0.1);s.lineTo(1.1,0.33);s.quadraticCurveTo(0.9,0.46,0.5,0.47);s.lineTo(-0.98,0.5);s.lineTo(-0.98,0.1);s.lineTo(1.1,0.1);}),1.8,0.05,navy));
+    // wheel-arch fenders
+    const ff=shp(s=>{s.moveTo(2.56,0.14);s.absarc(1.6,0.36,0.46,-0.5,Math.PI+0.5,false);s.lineTo(0.95,0.14);s.lineTo(0.95,0.48);s.quadraticCurveTo(1.12,0.9,1.6,0.9);s.quadraticCurveTo(2.25,0.88,2.56,0.42);s.lineTo(2.56,0.14);});
+    const rf=shp(s=>{s.moveTo(-0.85,0.14);s.absarc(-1.5,0.36,0.46,-0.5,Math.PI+0.5,false);s.lineTo(-2.5,0.14);s.lineTo(-2.55,0.66);s.quadraticCurveTo(-2.25,0.96,-1.5,0.95);s.quadraticCurveTo(-0.98,0.93,-0.85,0.58);s.lineTo(-0.85,0.14);});
+    for(const sd of[-1,1]){g.add(ext(ff,0.36,0.05,paint,sd*0.8));g.add(ext(rf,0.4,0.05,paint,sd*0.8));}
+    // canopy with a painted spine, roof intake, shark fin
+    const can=shp(s=>{s.moveTo(1.12,0.5);s.quadraticCurveTo(0.55,1.04,-0.15,1.05);s.quadraticCurveTo(-0.95,1.04,-1.42,0.62);s.lineTo(-1.42,0.5);s.lineTo(1.12,0.5);});
+    g.add(ext(can,0.6,0.1,glass));
+    g.add(ext(can,0.16,0.108,paint));
+    g.add(bx(0.62,0.08,0.3,paint,-0.38,1.2,0));
+    g.add(ext(shp(s=>{s.moveTo(-0.5,1.1);s.lineTo(-2.3,1.18);s.lineTo(-2.42,0.66);s.lineTo(-1.35,0.66);s.quadraticCurveTo(-0.9,0.9,-0.5,1.1);}),0.035,0,paint));
+    // rear wing, splitter, diffuser, mirrors
+    g.add(bx(0.44,0.05,1.96,carbon,-2.34,1.17,0));
+    const flap=bx(0.26,0.035,1.96,paint,-2.52,1.24,0);flap.rotation.z=0.5;g.add(flap);
+    for(const sd of[-1,1]){g.add(bx(0.8,0.52,0.03,navy,-2.36,1.0,sd*0.99));g.add(bx(0.05,0.42,0.05,carbon,-2.2,0.93,sd*0.3));}
+    g.add(bx(0.55,0.035,1.98,carbon,2.3,0.075,0));
+    g.add(bx(0.36,0.16,1.5,carbon,-2.44,0.17,0));
+    for(const sd of[-1,1]){g.add(bx(0.16,0.07,0.12,paint,1.0,0.84,sd*0.68));g.add(bx(0.03,0.14,0.03,carbon,1.02,0.75,sd*0.64));}
+    // lights
+    for(const sd of[-1,1]){
+      const hl=bx(0.2,0.05,0.24,headMat,2.4,0.64,sd*0.8);hl.rotation.z=-0.72;g.add(hl);
+      const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex,color:col(0xffe7b8),blending:THREE.AdditiveBlending,transparent:true,depthWrite:false,opacity:0}));
+      sp.position.set(2.66,0.6,sd*0.8);sp.scale.set(1.2,0.8,1);g.add(sp);glows.push(sp);
+    }
+    g.add(bx(0.03,0.045,1.72,tailMat,-2.61,0.62,0));
+    // livery decals
+    numT=ctex(256,256,numPaint);
+    teamT=ctex(1024,160,teamPaint);
+    for(const sd of[-1,1]){
+      const n=pl(0.34,0.34,decal(numT.tex),-1.7,0.9,sd*0.021);n.name='num';if(sd<0)n.rotation.y=Math.PI;g.add(n);
+      const t=pl(1.5,0.234,decal(teamT.tex),0.06,0.29,sd*0.953);t.name='team';if(sd<0)t.rotation.y=Math.PI;g.add(t);
+    }
+    [[1.6,1],[1.6,-1],[-1.5,1],[-1.5,-1]].forEach(([x,sd])=>{const o=wheel(sd,x,rubber,rimM,paint);g.add(o.w);wheels.push(o);});
+    return g;
+  }
+  // the car being passed (or passing us): a repainted copy of our car
+  function buildRival(){
+    const r=car.clone(true);
+    rivalPaint=paintMat.clone();rivalStripe=new THREE.MeshBasicMaterial({color:col(0xffd23f)});
+    rivalNum=ctex(256,256,numPaint);
+    rivalTeam=ctex(1024,160,teamPaint);rivalNavy=navyMat.clone();
+    const dNum=decal(rivalNum.tex),dTeam=decal(rivalTeam.tex);
+    r.traverse(o=>{
+      if(o.material===paintMat)o.material=rivalPaint;
+      else if(o.material===navyMat)o.material=rivalNavy;
+      else if(o.name==='stripe')o.material=rivalStripe;
+      if(o.name==='num')o.material=dNum;else if(o.name==='team')o.material=dTeam;
+      if(o.name==='spin')rivalSpins.push({sp:o,dir:o.parent.userData.dir});
+    });
+    r.visible=false;return r;
+  }
+
+  /* ---------- showcase turntable ---------- */
+  function buildShow(){
+    const g=new THREE.Group();
+    floorMat=new THREE.MeshStandardMaterial({color:col(0x131c31),roughness:0.75,metalness:0.2,transparent:true,alphaMap:gradTex([[0,'#fff'],[0.55,'#fff'],[1,'#000']],true)});
+    g.add(flat(new THREE.Mesh(new THREE.CircleGeometry(5,72),floorMat)));
+    const ring=(r0,r1,op)=>{const m=flat(new THREE.Mesh(new THREE.RingGeometry(r0,r1,128),new THREE.MeshBasicMaterial({color:col(0xffb547),transparent:true,opacity:op})));m.position.y=0.003;g.add(m);};
+    ring(3.2,3.24,0.55);ring(3.55,3.565,0.18);
+    const tick=new THREE.MeshBasicMaterial({color:col(0xffb547),transparent:true,opacity:0.35});
+    for(let k=0;k<48;k++){const a=k/48*Math.PI*2;const m=flat(pl(0.02,k%4?0.08:0.18,tick,Math.cos(a)*3.38,0.003,Math.sin(a)*3.38));m.rotation.z=-a-Math.PI/2;g.add(m);}
+    return g;
+  }
+  function buildShadow(){
+    const t=ctex(256,128,(x)=>{x.setTransform(1,0,0,0.5,0,0);const gr=x.createRadialGradient(128,128,0,128,128,128);gr.addColorStop(0,'rgba(0,0,0,0.8)');gr.addColorStop(0.5,'rgba(0,0,0,0.5)');gr.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=gr;x.fillRect(0,0,256,256);});
+    const g=new THREE.Group();g.add(flat(pl(6.2,2.8,new THREE.MeshBasicMaterial({map:t.tex,transparent:true,depthWrite:false}),0,0,0)));return g;
+  }
+
+  /* ---------- pit box: floor paint, garage, fuel rig, crew, lollipop ---------- */
+  function crewMan(suit,helm,visor,accent){
+    const m=new THREE.Group();
+    const legs=new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.12,0.52,10),suit);legs.position.y=0.26;m.add(legs);
+    const body=new THREE.Mesh(new THREE.CylinderGeometry(0.17,0.2,0.62,12),suit);body.position.y=0.82;m.add(body);
+    const band=new THREE.Mesh(new THREE.CylinderGeometry(0.205,0.205,0.07,12),accent);band.position.y=0.74;m.add(band);
+    const head=new THREE.Mesh(new THREE.SphereGeometry(0.15,16,12),helm);head.position.y=1.29;m.add(head);
+    m.add(bx(0.2,0.07,0.07,visor,0,1.3,0.12));
+    return m;
+  }
+  function buildPit(){
+    const g=new THREE.Group();
+    pitFloorMat=new THREE.MeshStandardMaterial({color:col(0x1a2337),roughness:0.82,metalness:0.15,transparent:true,alphaMap:fadeTex});
+    g.add(flat(pl(34,14,pitFloorMat,0,0,-0.5)));
+    const paintL=(c,o)=>new THREE.MeshBasicMaterial({color:col(c),transparent:true,opacity:o});
+    g.add(flat(pl(34,0.08,paintL(0xdde3ee,0.55),0,0.003,2.7)));
+    g.add(flat(pl(34,0.06,paintL(0xffd23f,0.6),0,0.003,-2.05)));
+    const amber=paintL(0xffb547,0.9);
+    g.add(flat(pl(6.4,0.07,amber,0,0.004,1.6)));g.add(flat(pl(6.4,0.07,amber,0,0.004,-1.6)));
+    g.add(flat(pl(0.07,3.2,amber,3.2,0.004,0)));g.add(flat(pl(0.07,3.2,amber,-3.2,0.004,0)));
+    n88T=ctex(256,128,(x,w,h,n)=>{n=String(n||'88');x.fillStyle='rgba(255,181,71,0.5)';x.font=`800 ${n.length>2?84:110}px ${FONT}`;x.textAlign='center';x.textBaseline='middle';x.fillText(n,w/2,h/2+6);});
+    g.add(flat(pl(1.1,0.55,new THREE.MeshBasicMaterial({map:n88T.tex,transparent:true,depthWrite:false}),0,0.005,2.15)));
+    // garage row
+    const wallM=new THREE.MeshStandardMaterial({color:col(0x1b2645),roughness:0.6,metalness:0.2});
+    g.add(bx(30,3.8,0.3,wallM,0,1.9,-4.6));
+    const dark=new THREE.MeshBasicMaterial({color:col(0x05070d)});
+    for(const gx of[-9.5,0,9.5]){g.add(pl(6,2.9,dark,gx,1.45,-4.44));g.add(bx(6,0.05,0.05,new THREE.MeshBasicMaterial({color:col(gx?0x6b7899:0xf2f5ff)}),gx,2.92,-4.42));}
+    signT=ctex(1024,140,(x,w,h,a)=>{a=a||{};x.fillStyle=a.bg||'#16213d';x.fillRect(0,0,w,h);x.fillStyle=a.fg||'#ffb547';x.font=`800 88px ${FONT}`;x.textAlign='center';x.textBaseline='middle';x.fillText('#'+(a.num||'88')+'  '+String(a.name||'Harbour Racing').toUpperCase(),w/2,h/2+5,w-40);});
+    g.add(pl(4.4,0.6,new THREE.MeshBasicMaterial({map:signT.tex}),0,3.32,-4.44));
+    // fuel boom and hose
+    const carbon=new THREE.MeshStandardMaterial({color:col(0x14171e),metalness:0.35,roughness:0.45});
+    g.add(bx(0.14,0.14,3.4,carbon,-0.5,3.1,-2.9));
+    const curve=new THREE.CatmullRomCurve3([new THREE.Vector3(-0.5,3.05,-1.25),new THREE.Vector3(-0.52,2.3,-0.95),new THREE.Vector3(-0.55,1.55,-0.62),new THREE.Vector3(-0.56,1.2,-0.4)]);
+    hose=new THREE.Mesh(new THREE.TubeGeometry(curve,24,0.04,8,false),new THREE.MeshStandardMaterial({color:col(0x0c0e13),roughness:0.55}));hose.visible=false;g.add(hose);
+    // crew
+    const suit=new THREE.MeshStandardMaterial({color:col(0x1d2a4d),roughness:0.7});
+    const helm=new THREE.MeshPhysicalMaterial({color:col(0xffb547),roughness:0.3,clearcoat:1});
+    const visor=new THREE.MeshStandardMaterial({color:col(0x0a0f1a),metalness:0.6,roughness:0.15});
+    const acc=new THREE.MeshStandardMaterial({color:col(0xffb547),roughness:0.5});
+    CREW_DEF.forEach(d=>{const m=crewMan(suit,helm,visor,acc);m.position.set(d.stand[0],0,d.stand[1]);g.add(m);crew.push({d,m,x:d.stand[0],z:d.stand[1]});});
+    // lollipop
+    lolliT=ctex(256,256,(x,w,h,txt)=>{txt=txt||'BRAKES';x.fillStyle=txt==='GO'?'#3ccf7a':txt==='STOP & GO'?'#ff5a5f':'#ffb547';x.beginPath();x.arc(w/2,h/2,124,0,Math.PI*2);x.fill();x.fillStyle='#0b0f19';x.font=`800 ${txt.length>6?50:76}px ${FONT}`;x.textAlign='center';x.textBaseline='middle';x.fillText(txt,w/2,h/2+4);});
+    const lp=new THREE.Group();lp.position.set(3.75,0,1.05);lp.rotation.y=0.28;
+    lp.add(bx(0.04,1.55,0.04,carbon,0,0.78,0));
+    lp.add(pl(0.62,0.62,new THREE.MeshBasicMaterial({map:lolliT.tex,transparent:true,side:THREE.DoubleSide}),0,1.75,0));
+    g.add(lp);
+    // driver for the driver change
+    driverFig=crewMan(new THREE.MeshStandardMaterial({color:col(0xffb547),roughness:0.6}),helm,visor,suit);driverFig.scale.setScalar(0.9);driverFig.visible=false;g.add(driverFig);
+    return g;
+  }
+
+  /* ---------- overtake cam: two cars side by side on a scrolling straight ---------- */
+  function buildBattle(){
+    const g=new THREE.Group();
+    const asph=ctex(256,256,(x,w,h)=>{x.fillStyle='#1c2232';x.fillRect(0,0,w,h);for(let i=0;i<1600;i++){const v=34+Math.random()*44;x.fillStyle=`rgba(${v},${v+6},${v+20},0.6)`;x.fillRect(Math.random()*w,Math.random()*h,1.6,1.6);}});
+    asph.tex.wrapS=asph.tex.wrapT=THREE.RepeatWrapping;asph.tex.repeat.set(14,3);
+    battleFloor=new THREE.MeshStandardMaterial({map:asph.tex,roughness:0.8,metalness:0.1,transparent:true,alphaMap:fadeTex});
+    g.add(flat(pl(60,14,battleFloor,0,0,0)));
+    const dash=ctex(128,16,(x,w,h)=>{x.fillStyle='#e8edf7';x.fillRect(0,0,w*0.55,h);});dash.tex.wrapS=THREE.RepeatWrapping;dash.tex.repeat.set(24,1);
+    const kerb=ctex(128,16,(x,w,h)=>{x.fillStyle='#e8edf7';x.fillRect(0,0,w/2,h);x.fillStyle='#ff5a5f';x.fillRect(w/2,0,w/2,h);});kerb.tex.wrapS=THREE.RepeatWrapping;kerb.tex.repeat.set(40,1);
+    g.add(flat(pl(60,0.08,new THREE.MeshBasicMaterial({map:dash.tex,transparent:true,opacity:0.7}),0,0.004,-0.18)));
+    g.add(flat(pl(60,0.3,new THREE.MeshBasicMaterial({map:kerb.tex}),0,0.004,2.6)));
+    g.add(flat(pl(60,0.3,new THREE.MeshBasicMaterial({map:kerb.tex}),0,0.004,-3.0)));
+    scrollTex.push(asph.tex,dash.tex,kerb.tex);
+    const N=70;streakPos=new Float32Array(N*6);
+    for(let i=0;i<N;i++){const x=Math.random()*32-16,y=0.2+Math.random()*2.6,z=-4+Math.random()*7,len=1+Math.random()*2.5;streakPos.set([x,y,z,x+len,y,z],i*6);}
+    const sg=new THREE.BufferGeometry();sg.setAttribute('position',new THREE.BufferAttribute(streakPos,3));
+    streaks=new THREE.LineSegments(sg,new THREE.LineBasicMaterial({color:col(0xdfe8ff),transparent:true,opacity:0,depthWrite:false}));streaks.frustumCulled=false;g.add(streaks);
+    g.visible=false;return g;
+  }
+  function buildFx(){
+    const N=420;rainPos=new Float32Array(N*6);
+    for(let i=0;i<N;i++){const x=(Math.random()-0.5)*16,y=Math.random()*7,z=(Math.random()-0.5)*9;rainPos.set([x,y,z,x+0.04,y-0.32,z],i*6);}
+    const rg=new THREE.BufferGeometry();rg.setAttribute('position',new THREE.BufferAttribute(rainPos,3));
+    rain=new THREE.LineSegments(rg,new THREE.LineBasicMaterial({color:col(0xa8cdff),transparent:true,opacity:0,depthWrite:false}));rain.visible=false;rain.frustumCulled=false;scene.add(rain);
+    const M=180;sparkPos=new Float32Array(M*3).fill(-50);sparkVel=new Float32Array(M*3);sparkLife=new Float32Array(M);
+    const sg=new THREE.BufferGeometry();sg.setAttribute('position',new THREE.BufferAttribute(sparkPos,3));
+    sparks=new THREE.Points(sg,new THREE.PointsMaterial({color:col(0xffb04a),size:0.07,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false}));sparks.frustumCulled=false;scene.add(sparks);
+  }
+
+  /* ---------- setup ---------- */
+  function fail(){const f=document.getElementById('stageFallback');if(f)f.hidden=false;const h=document.getElementById('shHint');if(h)h.hidden=true;S.ok=false;}
+  function init(){
+    const cv=document.getElementById('stageCv');
+    if(!window.THREE||!cv){fail();return;}
+    try{
+      R=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true,powerPreference:'low-power'});
+      R.setPixelRatio(Math.min(window.devicePixelRatio||1,1.75));
+      R.outputEncoding=THREE.sRGBEncoding;R.setClearColor(0x000000,0);
+      scene=new THREE.Scene();
+      cam=new THREE.PerspectiveCamera(30,2,0.1,200);
+      scene.environment=buildEnv();
+      hemi=new THREE.HemisphereLight(col(0xc4d4ff),col(0x0b1020),0.55);scene.add(hemi);
+      key=new THREE.DirectionalLight(col(0xffffff),1.5);key.position.set(4,8,6);scene.add(key);
+      rim=new THREE.DirectionalLight(col(0xffc27a),0.9);rim.position.set(-6,3,-6);scene.add(rim);
+      glowTex=gradTex([[0,'rgba(255,255,255,1)'],[0.35,'rgba(255,255,255,0.35)'],[1,'rgba(255,255,255,0)']],true);
+      fadeTex=gradTex([[0,'#000'],[0.12,'#fff'],[0.88,'#fff'],[1,'#000']],false);
+      car=buildCar();scene.add(car);
+      rival=buildRival();scene.add(rival);
+      shadowG=buildShadow();scene.add(shadowG);
+      showG=buildShow();scene.add(showG);
+      pitG=buildPit();pitG.visible=false;scene.add(pitG);
+      battleG=buildBattle();scene.add(battleG);
+      buildFx();
+      bindDrag(cv);
+      place();
+      if(window.ResizeObserver)new ResizeObserver(()=>place()).observe(stageEl());else window.addEventListener('resize',place);
+      if(window.IntersectionObserver)new IntersectionObserver(es=>{S.visible=es[0].isIntersecting;}).observe(stageEl());
+      if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>{S.livKey='';lolliT.draw(S.lolli);});
+      S.ok=true;
+    }catch(err){console.warn('3D stage unavailable',err);fail();}
+  }
+  function bindDrag(cv){
+    cv.addEventListener('pointerdown',e=>{if(S.mode!=='show')return;S.drag={x:e.clientX,yaw:S.yaw};try{cv.setPointerCapture(e.pointerId);}catch(err){}cv.style.cursor='grabbing';});
+    cv.addEventListener('pointermove',e=>{if(S.drag)S.yaw=S.drag.yaw+(e.clientX-S.drag.x)*0.012;});
+    const end=()=>{if(!S.drag)return;S.drag=null;S.lastTouch=performance.now();cv.style.cursor='';};
+    cv.addEventListener('pointerup',end);cv.addEventListener('pointercancel',end);
+  }
+  function place(){
+    const el=stageEl();if(!R||!el)return;const w=el.clientWidth,h=el.clientHeight;if(!w||!h)return;
+    R.setSize(w,h,false);cam.aspect=w/h;cam.fov=30;
+    const a=w/h,t=Math.tan(cam.fov*Math.PI/360);
+    let tgt,dir,visH;
+    if(S.mode==='show'){visH=Math.max(3.5,7.4/a);tgt=new THREE.Vector3(0,0.55,0);dir=new THREE.Vector3(0,0.28,1);}
+    else if(S.mode==='pit'){visH=Math.max(5.6,13/a);tgt=new THREE.Vector3(0.5,-0.35,0.1);dir=new THREE.Vector3(0.3,0.5,1);}
+    else{visH=Math.max(3.6,9/a);tgt=new THREE.Vector3(0,0.15,-0.2);dir=new THREE.Vector3(0.45,0.3,1);}
+    dir.normalize();
+    cam.position.copy(tgt).addScaledVector(dir,visH/2/t);cam.lookAt(tgt);cam.updateProjectionMatrix();
+    S.camBase=cam.position.clone();S.camTgt=tgt;
+  }
+  function onMode(){
+    showG.visible=S.mode==='show';pitG.visible=S.mode==='pit';battleG.visible=rival.visible=S.mode==='battle';
+    car.position.set(S.mode==='pit'?-5.5:0,0,S.mode==='battle'?0.95:0);
+    wheels.forEach(o=>{o.off=0;o.w.position.z=o.bz;});
+    place();
+    const cv=document.getElementById('stageCv');cv.classList.remove('flash');void cv.offsetWidth;cv.classList.add('flash');
+    S.stepsKey='';S.bg='';
+  }
+  function setWheel(o,k){if(k&&k!==o.k){o.k=k;o.sm.color.copy(col(TYRE_HEX[k]||0xffd23f));}}
+  function setStripe(k){wheels.forEach(o=>setWheel(o,k));}
+  function spin(){wheels.forEach(o=>{o.sp.rotation.z=S.spin*o.dir;});}
+
+  /* ---------- poses ---------- */
+  function poseShow(dt,c){
+    if(!S.drag&&!reduced&&performance.now()-S.lastTouch>2500)S.yaw+=dt*0.3;
+    car.position.set(0,0,0);car.rotation.y=S.yaw;
+    const running=c&&G.running&&!G.paused&&!G.modal&&(c.state==='run'||c.state==='limp');
+    if(running)S.spin-=dt*(c.state==='limp'?1.2:3.5);
+    spin();
+    setStripe(c?c.tyre.c:START.tyre);
+    hose.visible=false;driverFig.visible=false;
+  }
+  // where the player's stop is in its timeline: in → stop & go → fuel/driver → tyres → garage → out
+  function phaseAt(c){
+    const sv=c.svc;
+    if(c.hold||!sv)return {name:'hold',u:0,i:-1};
+    if(G.mini){const i=sv.phases.findIndex(p=>p[0]==='tyre');if(i>=0)return {name:'tyre',u:0.5,i};}
+    const e=clamp(c.pitTotal-Math.max(0,c.pitTimer),0,c.pitTotal);let acc=0;
+    for(let i=0;i<sv.phases.length;i++){const [n,d]=sv.phases[i];if(e<=acc+d||i===sv.phases.length-1)return {name:n,u:d>0?clamp((e-acc)/d,0,1):1,i};acc+=d;}
+    return {name:'hold',u:0,i:-1};
+  }
+  function fig(x0,y0,z0,x1,y1,z1,t){driverFig.visible=true;driverFig.position.set(lerp(x0,x1,t),lerp(y0,y1,t)+Math.sin(t*Math.PI)*0.5,lerp(z0,z1,t));}
+  function posePit(dt,c){
+    const P=phaseAt(c),sv=P.name==='hold'?null:c.svc,u=P.u;
+    let x=0,lift=0,off=0,kneel=false,fuelOn=false,spark=false;
+    const wp=sv?(sv.phases.some(p=>p[0]==='tyre')?'tyre':((sv.newTyre||sv.brakes)?'garage':null)):null;
+    const wi=sv&&wp?sv.phases.findIndex(p=>p[0]===wp):-1;
+    if(P.name==='hold')x=-5.5;
+    else if(P.name==='in')x=-5.5*(1-u)*(1-u);
+    else if(P.name==='out')x=12*u*u;
+    else if(P.name==='fuel')fuelOn=sv.fuelTo-sv.fuelFrom>0.004;
+    else if(P.name==='tyre'||P.name==='garage'){
+      lift=G.mini?0.16:(P.name==='garage'?0.22:0.16)*sm(0,0.1,u)*(1-sm(0.9,1,u));kneel=true;
+      if(P.name===wp&&!G.mini&&!sv.miniDone)off=u<0.42?sm(0.15,0.42,u):u<0.58?1:1-sm(0.58,0.85,u);
+      if(P.name==='garage')spark=u>0.15&&u<0.85;
+    }
+    let comp=sv?sv.oldTyre:c.tyre.c;
+    if(sv&&sv.newTyre&&wi>=0&&(P.i>wi||(P.i===wi&&(u>0.5||sv.miniDone))))comp=sv.newTyre;
+    const dx=x-car.position.x;car.position.set(x,lift,0);car.rotation.y=0;
+    S.spin-=dx/0.36;spin();
+    const m=G.mini,kk=m?Math.min(1,dt*10):1;
+    wheels.forEach((o,i)=>{
+      let t=off,k=comp;
+      // mini-game: the wheel being aimed at is off; once hit it goes back on with the new tyre
+      if(m&&sv){t=i===m.i&&m.st==='aim'?1:0;k=(i<m.i||(i===m.i&&m.st!=='aim'))?(sv.newTyre||sv.oldTyre):sv.oldTyre;}
+      o.off+=(t-o.off)*kk;setWheel(o,k);
+      o.w.position.z=o.bz+Math.sign(o.bz)*o.off*0.85;
+    });
+    hose.visible=fuelOn;
+    if(spark&&!reduced)emit(3);
+    const k=Math.min(1,dt*6);
+    crew.forEach(cm=>{
+      const r=cm.d.role;let act;
+      if(r==='lolli')act=true;
+      else if(P.name==='hold'||P.name==='pen'||P.name==='out')act=false;
+      else if(P.name==='in')act=u>0.55&&r!=='fuel';
+      else if(P.name==='fuel')act=r!=='jack';
+      else act=r!=='fuel'||P.name==='garage';
+      const t=act?cm.d.work:cm.d.stand;
+      cm.x+=(t[0]-cm.x)*k;cm.z+=(t[1]-cm.z)*k;
+      cm.m.position.set(cm.x,0,cm.z);cm.m.lookAt(car.position.x,0,0);
+      const ky=act&&kneel&&r==='wheel'?0.64:1;cm.m.scale.y+=(ky-cm.m.scale.y)*Math.min(1,dt*8);
+    });
+    const last=sv?sv.phases.length-1:0;
+    const lt=P.name==='pen'?'STOP & GO':(P.name==='out'||(sv&&P.i===last-1&&u>0.9))?'GO':'BRAKES';
+    if(lt!==S.lolli){S.lolli=lt;lolliT.draw(lt);}
+    driverFig.visible=false;
+    if(P.name==='fuel'&&sv&&sv.swap){
+      if(u>0.04&&u<0.42)fig(-0.15,0.45,0,-0.4,0,-1.9,sm(0.04,0.42,u));
+      else if(u>0.5&&u<0.9)fig(0.4,0,-1.9,-0.15,0.45,0,sm(0.5,0.9,u));
+    }
+  }
+  function poseBattle(dt){
+    const b=S.battle,u=clamp((performance.now()-b.t0)/b.dur,0,1);
+    const rx=b.type==='passed'?lerp(-10,7,easeIO(u)):lerp(2.8,-10,easeIO(u));
+    car.position.set(0,0,0.95);car.rotation.y=0;
+    rival.position.set(rx,0,-1.3);rival.rotation.y=0;
+    const v=24;
+    S.spin-=dt*v/0.36;spin();
+    S.rspin-=dt*v/0.36;rivalSpins.forEach(o=>{o.sp.rotation.z=S.rspin*o.dir;});
+    scrollTex.forEach(t=>{t.offset.x+=dt*v*t.repeat.x/60;});
+    const a=streakPos;
+    for(let i=0;i<a.length;i+=6){a[i]-=dt*v*1.6;a[i+3]-=dt*v*1.6;if(a[i+3]<-16){const len=a[i+3]-a[i];a[i]=16;a[i+3]=16+len;}}
+    streaks.geometry.attributes.position.needsUpdate=true;
+    streaks.material.opacity=0.55*Math.min(1,u*6,(1-u)*6);
+    // punch in and shake while the two cars are side by side
+    const near=Math.max(0,1-Math.abs(rx)/3.5);
+    cam.fov=30-4*near;
+    cam.position.copy(S.camBase);
+    cam.position.x+=(Math.random()-0.5)*0.05*near;cam.position.y+=(Math.random()-0.5)*0.05*near;
+    cam.lookAt(S.camTgt);cam.updateProjectionMatrix();
+    hose.visible=false;driverFig.visible=false;
+    if(u>=1)S.battle=null;
+  }
+
+  /* ---------- particles ---------- */
+  function emit(n){
+    for(let k=0;k<n;k++){
+      const i=S.sparkIdx=(S.sparkIdx+1)%sparkLife.length;
+      const wx=Math.random()<0.5?1.6:-1.5,wz=(Math.random()<0.5?1:-1)*0.9;
+      sparkPos[i*3]=car.position.x+wx;sparkPos[i*3+1]=car.position.y+0.4;sparkPos[i*3+2]=wz;
+      sparkVel[i*3]=(Math.random()-0.5)*2.5;sparkVel[i*3+1]=1+Math.random()*2.5;sparkVel[i*3+2]=Math.sign(wz)*(0.5+Math.random()*2);
+      sparkLife[i]=0.4+Math.random()*0.5;
+    }
+  }
+  function updSparks(dt){
+    let any=false;
+    for(let i=0;i<sparkLife.length;i++){
+      if(sparkLife[i]<=0)continue;any=true;sparkLife[i]-=dt;sparkVel[i*3+1]-=9.8*dt;
+      sparkPos[i*3]+=sparkVel[i*3]*dt;sparkPos[i*3+1]+=sparkVel[i*3+1]*dt;sparkPos[i*3+2]+=sparkVel[i*3+2]*dt;
+      if(sparkLife[i]<=0||sparkPos[i*3+1]<0){sparkLife[i]=0;sparkPos[i*3+1]=-50;}
+    }
+    sparks.visible=any;if(any)sparks.geometry.attributes.position.needsUpdate=true;
+  }
+  function updRain(dt,r){
+    rain.visible=r>0.02;if(!rain.visible)return;
+    rain.material.opacity=Math.min(0.7,r*0.8);
+    const a=rainPos,v=dt*(reduced?3:10);
+    for(let i=0;i<a.length;i+=6){a[i+1]-=v;a[i+4]-=v;if(a[i+4]<0){const y=6+Math.random()*1.5;a[i+1]=y;a[i+4]=y-0.32;}}
+    rain.geometry.attributes.position.needsUpdate=true;
+  }
+
+  /* ---------- per-frame update and HUD ---------- */
+  function timer(c){
+    const t=$('#pcTimer'),tt=$('#pcTotal');
+    if(c.hold||!c.svc){t.textContent='待命';tt.textContent='';return;}
+    t.textContent=(c.pitTotal-Math.max(0,c.pitTimer)).toFixed(1)+'s';tt.textContent='/ '+c.pitTotal.toFixed(1)+'s';
+  }
+  function update(dt){
+    if(!S.ok||document.hidden||!S.visible)return;
+    const c=G&&G.cars&&G.cars.length?me():null;
+    let mode='show';
+    if(c&&G.running&&c.state==='pit'){mode='pit';S.battle=null;}
+    else if(S.battle)mode='battle';
+    if(mode!==S.mode){S.mode=mode;onMode();}
+    const e=(G&&G.env)||{light:1,rain:0,wet:0};
+    const night=e.light<0.4;
+    if(mode!=='pit'){hemi.intensity=0.3+0.35*e.light;key.intensity=0.55+1.0*e.light;rim.intensity=night?1.5:0.85;}
+    else{hemi.intensity=0.6;key.intensity=1.35;rim.intensity=0.9;}
+    headMat.emissiveIntensity=night?3.5:0.9;
+    glows.forEach(s=>{s.material.opacity=night?0.85:0;});
+    const blink=!!c&&(c.state==='limp'||e.rain>0.05);
+    tailMat.emissiveIntensity=blink?(performance.now()%700<350?3.5:0.5):1.4;
+    floorMat.roughness=0.78-0.5*e.wet;pitFloorMat.roughness=0.82-0.5*e.wet;battleFloor.roughness=0.8-0.55*e.wet;
+    const bg=mode==='pit'?'pit':Math.round(e.light*20)+':'+Math.round(e.rain*10);
+    if(bg!==S.bg){
+      S.bg=bg;const sc=skyColor(e.light);
+      stageEl().style.background=mode==='pit'?'linear-gradient(180deg,#162038,#0b111f 85%)':`radial-gradient(120% 95% at 50% 0%,rgba(${sc},${(0.6-0.25*e.rain).toFixed(2)}),rgba(${sc},0) 72%),linear-gradient(180deg,var(--panel-hi),var(--deck) 80%)`;
+    }
+    if(mode==='show')poseShow(dt,c);else if(mode==='pit')posePit(dt,c);else poseBattle(dt);
+    shadowG.position.set(car.position.x,0.006,car.position.z);shadowG.rotation.y=car.rotation.y;
+    updRain(dt,e.rain||0);updSparks(dt);
+    if(mode==='pit')timer(c);
+    R.render(scene,cam);
+  }
+  // overtake banner (always) plus the chase-cam scene when the stage is on screen
+  function overtake(ev){
+    const el=$('#ot'),o=G.cars[ev.rival];if(!el||!o)return;
+    const lost=ev.type==='passed';
+    el.className='ot '+(lost?'dn':ev.lead?'lead':'up');
+    $('#otK').textContent=lost?'LOST POSITION':ev.lead?'NEW LEADER':'OVERTAKE';
+    $('#otBig').textContent=lost?'被爬頭':ev.lead?'領先全場！':'爬頭！';
+    $('#otSub').textContent=lost?`${ev.where} · #${o.num} ${o.team} 超越 · ▼ P${ev.pos}`:`${ev.where} · 超越 #${o.num} ${o.team} · ▲ P${ev.pos}`;
+    el.hidden=false;el.style.animation='none';void el.offsetWidth;el.style.animation='';
+    clearTimeout(S.otTimer);S.otTimer=setTimeout(()=>{el.hidden=true;},2700);
+    if(!S.ok||reduced||!S.visible||document.hidden||S.mode==='pit'||S.battle)return;
+    const L=o.liv||[o.color,'#17223f','#e8edf7'];
+    rivalPaint.color.copy(col(hx(L[0])));rivalNavy.color.copy(col(hx(L[1])));
+    rivalStripe.color.copy(col(TYRE_HEX[o.tyre.c]||0xffd23f));
+    rivalNum.draw(o.num);rivalTeam.draw({name:o.team,color:L[2]});
+    S.battle={type:ev.type,t0:performance.now(),dur:2600};
+  }
+  // repaint the showcase car, decals and garage sign in the chosen team's colours
+  function applyLivery(src){
+    const L=src.liv||['#ffb547','#17223f','#ffb547'],k=[src.num,src.team,L.join()].join('|');
+    if(k===S.livKey)return;S.livKey=k;
+    paintMat.color.copy(col(hx(L[0])));navyMat.color.copy(col(hx(L[1])));
+    numT.draw(src.num);n88T.draw(src.num);teamT.draw({name:src.team,color:L[2]});signT.draw({name:src.team,num:src.num,bg:L[1],fg:L[2]});
+  }
+  function stepLbl(n,sv){
+    if(n==='fuel')return (sv.fuelTo-sv.fuelFrom>0.004?`加油 ${Math.round(sv.fuelFrom*100)}→${Math.round(sv.fuelTo*100)}%`:'停車')+(sv.swap?` · ${sv.swap[0]}→${sv.swap[1]}`:'');
+    if(n==='tyre')return `換胎 ${sv.oldTyre}→${sv.newTyre}${sv.miniDelta!=null?`（${sv.miniDelta>0?'+':'−'}${Math.abs(sv.miniDelta).toFixed(1)}s）`:''}`;
+    if(n==='garage')return ['車房',sv.brakes?'剎車碟':'',sv.repair==='full'?'全修':sv.repair==='quick'?'快修':'',sv.fix?'修理故障':'',sv.newTyre&&!sv.phases.some(p=>p[0]==='tyre')?`${sv.newTyre} 胎`:''].filter(Boolean).join(' · ');
+    if(n==='pen')return 'Stop & Go';
+    return n==='in'?'進站':'出站';
+  }
+  function hud(){
+    const c=G&&G.cars&&G.cars.length?me():null;
+    const src=c||pickedTeam();
+    $('#shTeam').textContent=src.team;
+    $('#shEye').textContent=`#${src.num} · ${src.mk} ${src.car}`;
+    if(S.ok)applyLivery(src);
+    let pills;
+    if(c&&c.state==='dnf')pills=`<span class="pill bad">退出：${esc(c.dnfWhy)}</span>`;
+    else if(c){const d=c.drivers[c.di];pills=`<span class="pill">P${posOf(c)}</span><span class="pill">${d.tag} ${c.state==='pit'?'喺維修站':c.state==='done'?'完賽':'駕駛中'}</span><span class="pill"><span class="ty ty-${c.tyre.c}">${c.tyre.c}</span> ${Math.round(c.tyre.wear*100)}%</span><span class="pill">燃油 ${Math.round(c.fuel*100)}%</span>${c.state==='limp'?'<span class="pill bad">慢駛返站</span>':''}`;}
+    else pills='<span class="pill">等候起步</span>';
+    $('#shInfo').innerHTML=pills;
+    const pit=S.ok&&S.mode==='pit'&&!!c;
+    $('#pitcam').hidden=!pit;$('#shHint').hidden=pit||S.mode==='battle'||!S.ok;
+    stageEl().classList.toggle('busy',pit||S.mode==='battle');
+    if(!pit)return;
+    const P=phaseAt(c),sv=P.name==='hold'?null:c.svc;
+    const k=sv?sv.n+':'+P.i+':'+(sv.miniDone?1:0):'hold';
+    if(k!==S.stepsKey){
+      S.stepsKey=k;
+      $('#pcSteps').innerHTML=sv?sv.phases.map((p,i)=>`<li class="${i<P.i?'done':i===P.i?'now':''}">${stepLbl(p[0],sv)}</li>`).join(''):'<li class="now">等待入站指示</li>';
+    }
+    $('#pcSkip').hidden=!sv||G.opt.pitCam===false||!!G.pitSkip;
+  }
+  return {init,update,hud,overtake};
+})();
+
+/* ================= main loop ================= */
+let lastTs=0,slowTs=0;
+function frame(ts){
+  const real=Math.min(0.1,Math.max(0,(ts-(lastTs||ts))/1000));lastTs=ts;
+  if(G&&G.running&&!G.paused&&!G.modal&&!G.mini){
+    let sim=real*SPEEDS[G.speed];
+    const pc=me();
+    // pit cam: slow the whole race down so a stop plays out over about five seconds
+    if(G.opt.pitCam!==false&&!G.pitSkip&&pc.state==='pit'&&!pc.hold&&pc.svc)sim=Math.min(sim,real*clamp(pc.pitTotal/5,10,90));
+    // an open engineer call slows the race so there is time to read it
+    if(G.call){sim=Math.min(sim,real*15);G.call.left-=real;$('#callTime').textContent=Math.ceil(Math.max(0,G.call.left));$('#callBar').style.width=clamp(G.call.left/CALL_SECS,0,1)*100+'%';if(G.call.left<=0)chooseCall(G.call.def,true);}
+    while(sim>1e-6&&G.running&&!G.paused&&!G.modal&&!G.mini){const h=Math.min(1,sim);step(h);sim-=h;}
+  }
+  if(G&&G.mini&&G.running){if(!G.paused)miniTick(real);else renderMini();}
+  if(G&&G.cars.length){renderCars();if(FX.length){const evs=FX.splice(0);evs.forEach((ev,i)=>uiOvertake(ev,i===evs.length-1));}}
+  STAGE.update(real);
+  if(ts-slowTs>110){slowTs=ts;if(G&&G.cars.length)renderSlow();STAGE.hud();}
+  requestAnimationFrame(frame);
+}
+function boot(data){
+  buildMap();bindUI();drawSky();STAGE.init();
+  if(data&&data.G&&data.G.cars){
+    G=data.G;G.paused=true;
+    G.cars.forEach(c=>{c.sets=c.sets||{dry:TYRE_ALLOC.dry-1,wet:TYRE_ALLOC.wet};c.mods=c.mods||[];});
+    setupRaceUI();
+    if(G.ended){showEnd();}
+    else if(!G.running){showStart();}
+    else if(G.modal==='pit'&&G.plan){$('#pitOv').hidden=false;buildPitUI();}
+  }else showStart();
+  requestAnimationFrame(frame);
+}
+window.claude?.hot?.snapshot?.(()=>({G}));
+window.claude?.hot?.ready?window.claude.hot.ready(boot):boot(window.claude?.hot?.data??{});
+</script>
+
+</body>
+</html>
