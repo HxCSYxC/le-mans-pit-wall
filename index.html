@@ -239,6 +239,23 @@ kbd{font:600 11px/1 var(--f-data);padding:2px 5px;border:1px solid var(--rule-hi
 .qt-big{width:96px;text-align:center;font:800 54px/1 var(--f-disp);color:var(--sodium)}
 .qt-big small{display:block;margin-top:4px;font:700 12px/1 var(--f-body);color:var(--ink-2)}
 .qt-big.ok{color:var(--go)}.qt-big.bad{color:var(--stop)}
+.qt[data-k=fuel] .call-tag,.qt[data-k=swap] .call-tag,.qt[data-k=limit] .call-tag{color:var(--go)}
+.qt[data-k=fuel] .call-tag::before,.qt[data-k=swap] .call-tag::before,.qt[data-k=limit] .call-tag::before{background:var(--go)}
+.qt[data-k=launch] .call-tag{color:var(--caution)}.qt[data-k=launch] .call-tag::before{background:var(--caution)}
+.qt-road .qt-line{position:absolute;top:0;bottom:0;width:3px;margin-left:-1.5px;background:#fff}
+.qt-road .qt-line b{position:absolute;top:2px;left:6px;font:700 10px/1 var(--f-data);color:var(--ink);white-space:nowrap}
+.qt-gauge{position:relative;height:36px;border-radius:6px;background:var(--deck);overflow:hidden;box-shadow:inset 0 0 0 1px var(--rule);touch-action:manipulation}
+.qg-fill{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,#8a6420,var(--sodium))}
+.qt-gauge.over .qg-fill{background:linear-gradient(90deg,#8a6420,var(--stop))}
+.qg-ok{position:absolute;top:0;bottom:0;background:rgba(60,207,122,.35)}
+.qg-tgt{position:absolute;top:0;bottom:0;width:3px;margin-left:-1.5px;background:var(--go)}
+.qt-gauge small{position:absolute;right:8px;top:50%;transform:translateY(-50%);font:700 12px/1 var(--f-data);color:var(--ink)}
+.qt-flag{margin:0 auto;min-width:220px;text-align:center;padding:16px 18px;border-radius:10px;font:800 28px/1 var(--f-disp);letter-spacing:.08em;background:var(--deck);color:var(--caution);border:1px solid var(--rule)}
+.qt-flag.go{background:var(--go);border-color:var(--go);color:#04140a}
+.qt-flag.bad{background:var(--stop);border-color:var(--stop);color:#fff}
+.qt-swap{display:grid;gap:10px;justify-items:center}
+.qt-pad{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;width:100%}
+.qt-pad .qt-arr{padding:14px 0;font-size:24px}
 .qt-time{height:5px;border-radius:3px;background:var(--deck);overflow:hidden}
 .qt-time i{display:block;height:100%;background:var(--sodium)}
 @media (max-width:560px){.mini{padding:12px}.mini-hit{margin-left:0;width:100%;justify-content:center;padding:16px}.mini-hit kbd{display:none}.mini-car{width:96px}}
@@ -704,7 +721,7 @@ input[type=checkbox]{accent-color:var(--sodium);width:15px;height:15px}
         <label><input type="checkbox" id="optDialog" checked> 入站時打開設定</label>
         <label><input type="checkbox" id="optAutoPause" checked> 事件自動暫停</label>
         <label><input type="checkbox" id="optPitCam" checked> 入站慢鏡頭</label>
-        <label><input type="checkbox" id="optMini" checked> 小遊戲（換胎・剎車點・救車）</label>
+        <label><input type="checkbox" id="optMini" checked> 小遊戲（維修站・起步・剎車點・救車）</label>
       </div>
     </section>
 
@@ -740,8 +757,11 @@ input[type=checkbox]{accent-color:var(--sodium);width:15px;height:15px}
 
 <div class="mini qt" id="qt" hidden role="dialog" aria-labelledby="qtTitle">
   <div class="mini-h"><div><span class="call-tag" id="qtTag"></span><b id="qtTitle"></b></div><div class="qt-dots" id="qtDots"></div></div>
-  <div id="qtBrake"><div class="mini-track qt-road" id="qTrack"><i class="mz-g" id="qZoneG"></i><i class="mz-p" id="qZoneP"></i><span class="qt-sign" id="qS150">150</span><span class="qt-sign" id="qS100">100</span><span class="qt-sign" id="qS50">50</span><i class="qt-apex" id="qApex"></i><i class="mz-c" id="qCursor"></i></div></div>
+  <div id="qtBrake"><div class="mini-track qt-road" id="qTrack"><i class="mz-g" id="qZoneG"></i><i class="mz-p" id="qZoneP"></i><span class="qt-sign" id="qS150">150</span><span class="qt-sign" id="qS100">100</span><span class="qt-sign" id="qS50">50</span><i class="qt-apex" id="qApex"></i><i class="qt-line" id="qLine"><b>PIT 60</b></i><i class="mz-c" id="qCursor"></i></div></div>
+  <div id="qtFuel"><div class="qt-gauge" id="qGauge"><i class="qg-ok" id="qgOk"></i><i class="qg-fill" id="qgFill"></i><i class="qg-tgt" id="qgTgt"></i><small id="qgTxt"></small></div></div>
+  <div id="qtLaunch"><div class="qt-flag" id="qtFlag"></div></div>
   <div id="qtSpin" class="qt-spin"><button type="button" class="qt-arr" data-d="-1" aria-label="向左反軚">←</button><div class="qt-big" id="qtArrow"></div><button type="button" class="qt-arr" data-d="1" aria-label="向右反軚">→</button></div>
+  <div id="qtSwap" class="qt-swap"><div class="qt-big" id="qtSwapBig"></div><div class="qt-pad"><button type="button" class="qt-arr" data-d="-1" aria-label="左">←</button><button type="button" class="qt-arr" data-d="-2" aria-label="上">↑</button><button type="button" class="qt-arr" data-d="2" aria-label="下">↓</button><button type="button" class="qt-arr" data-d="1" aria-label="右">→</button></div></div>
   <div class="qt-time"><i id="qtBar"></i></div>
   <div class="mini-f"><span class="mini-g" id="qtGrade"></span><button type="button" class="mini-hit" id="qtHit">剎！<kbd>空白鍵</kbd></button></div>
   <p class="mini-note" id="qtNote"></p>
@@ -1159,6 +1179,8 @@ function updateFlag(dt){
       }else{
         G.flag={type:'green',until:0,since:G.t,cause:'',zone:0};
         radio('賽事',f.type==='slow'?`${ZONES[f.zone].name} 慢速區解除。`:'綠旗！比賽恢復。','go');
+        const pc=me();
+        if(f.type==='sc'&&pc.state==='run'&&qtOn()&&!G.qt&&!G.mini&&!G.modal)qtStart('launch',{restart:true});
       }
     }
     return;
@@ -1306,6 +1328,10 @@ function updateCar(c,dt){
   if(c.state==='dnf'||c.state==='done')return;
   if(c.state==='pit'){
     if(c.hold)return;
+    if(c.isPlayer&&c.svc&&c.svc.queue&&c.svc.queue.length&&qtOn()&&!G.qt){
+      const nx=c.svc.queue[0];
+      if(c.pitTotal-c.pitTimer+dt>=nx.at){c.pitTimer=c.pitTotal-nx.at;c.svc.queue.shift();qtStart(nx.k);return;}
+    }
     // the player's tyre change waits for the timing mini-game
     if(c.isPlayer&&c.svc&&!c.svc.miniDone&&G.opt.mini!==false){
       let acc=0,ts=-1;for(const [n,d] of c.svc.phases){if(n==='tyre'){ts=acc;break;}acc+=d;}
@@ -1415,6 +1441,11 @@ function startService(c,plan){
     c.svc={phases:[['in',s.lane/2],['pen',s.pen],['fuel',baseDur],['tyre',tyreDur],['garage',s.garage],['out',s.lane/2]].filter(p=>p[1]>0.01),
       fuelFrom:c.fuel,fuelTo:Math.min(1,c.fuel+plan.fuel),oldTyre:c.tyre.c,newTyre:plan.tyre||(c.punct?c.tyre.c:null),
       swap:plan.driver!==c.di?[c.drivers[c.di].tag,c.drivers[plan.driver].tag]:null,brakes:!!plan.brakes,repair:plan.repair||null,fix:!!(plan.fix&&c.issue),n:c.stops};
+    // pit-lane games run in order as the stop clock reaches them
+    const at=s.lane/2+s.pen,queue=[{k:'limit',at:0}];
+    if(plan.fuel>0.05)queue.push({k:'fuel',at});
+    if(c.svc.swap)queue.push({k:'swap',at});
+    c.svc.queue=queue;
     G.pitSkip=false;
   }
   c.fuel=Math.min(1,c.fuel+plan.fuel);
@@ -1623,40 +1654,86 @@ function defendOutcome(c,o,win,crashP){
   else radio(who(c),'守唔住，佢喺外線過咗。','bad');
 }
 
-/* ================= quick-time mini-games: braking point + spin save ================= */
+/* ================= quick-time mini-games ================= */
+// brake: battle braking point · spin: counter-steer save · limit: pit-lane speed limiter
+// fuel: hold-to-refuel · swap: driver change key sequence · launch: rolling start / safety-car restart
 const qtOn=()=>G.opt.mini!==false;
 // w shifts the base success chance; crash is the chance of contact when the move fails
 const BRAKE={perfect:{w:1,crash:0,label:'完美剎車點！'},good:{w:0.25,crash:0.08,label:'剎得幾好'},early:{w:-0.6,crash:0.02,label:'剎得太早'},late:{w:-0.4,crash:0.35,label:'剎得太遲，衝過咗位'}};
+const LIMIT={perfect:{d:-1,label:'完美！啱啱好 60 km/h 過線'},good:{d:-0.3,label:'好，順利入站'},early:{d:0,label:'限速開得太早，慢慢爬入去'},late:{d:0,label:'超速！罰 Drive-through'}};
+const FUEL={perfect:'完美！啱啱好入滿目標',good:'入得幾準',under:'放手太早，少入咗油',over:'入過龍，油溢出嚟',auto:'冇人揸油槍，自動入油'};
+const LAUNCH={perfect:'完美起步！',good:'起步唔錯',slow:'反應慢咗',jump:'偷步！'};
 const SPIN_WIN=[1.1,0.9,0.75];
+const SWAP_STEPS=['開車門','解安全帶','換人上車','扣安全帶'],SWAP_WIN=1.2,SWAP_SCORE={perfect:-0.8,good:-0.2,miss:2};
+const DIR_CH={'-1':'←','1':'→','-2':'↑','2':'↓'};
+const FUEL_T=1.6;
 function qtStart(kind,data){
-  const c=me(),e=G.env;
+  const c=me(),e=G.env;data=data||{};
   if(kind==='brake'){
     const o=G.cars[data.r],p=data.side==='attack'?attackP(c,o):defendP(c,o);
     const pw=(0.02+0.045*p)*(1-0.25*e.wet)*(e.light<0.4?0.85:1);
     G.qt={kind,data,p,st:'aim',el:0,dur:rr(1.5,1.9),zone:{c:rr(0.7,0.84),pw,gw:pw*2.6},hx:null,res:null,wait:0};
+  }else if(kind==='limit'){
+    const pw=0.035*(e.light<0.4?0.85:1);
+    G.qt={kind,data,st:'aim',el:0,dur:rr(1.4,1.8),zone:{c:rr(0.72,0.86),pw,gw:pw*2.6},hx:null,res:null,wait:0};
+  }else if(kind==='fuel'){
+    const sv=c.svc;
+    G.qt={kind,data,st:'aim',el:0,ht:0,hold:false,from:sv.fuelFrom,to:sv.fuelTo,res:null,wait:0};
+  }else if(kind==='launch'){
+    G.qt={kind,data,st:'wait',el:0,go:rr(1.3,3.2),rt:null,res:null,wait:0};
+  }else if(kind==='swap'){
+    const ds=[-1,1,-2,2];
+    G.qt={kind,data:{swap:c.svc&&c.svc.swap},st:'aim',el:0,i:0,seq:SWAP_STEPS.map(()=>pick(ds)),res:[],wait:0};
   }else{
     G.qt={kind,data,st:'aim',el:0,i:0,seq:SPIN_WIN.map(()=>rnd()<0.5?-1:1),res:[],wait:0};
   }
   renderQT();
 }
-// the car speeds towards the corner, so the marker accelerates across the bar
+// the car speeds towards the corner or pit line, so the marker accelerates across the bar
 const qtX=q=>Math.pow(q.el/q.dur,1.35);
 function qtHit(){
-  const q=G&&G.qt;if(!q||q.kind!=='brake'||q.st!=='aim')return;
-  const x=qtX(q),d=x-q.zone.c;
-  qtBrakeGrade(Math.abs(d)<=q.zone.pw?'perfect':Math.abs(d)<=q.zone.gw?'good':d<0?'early':'late',x);
+  const q=G&&G.qt;if(!q)return;
+  if(q.kind==='brake'||q.kind==='limit'){
+    if(q.st!=='aim')return;
+    const x=qtX(q),d=x-q.zone.c;
+    qtBarGrade(Math.abs(d)<=q.zone.pw?'perfect':Math.abs(d)<=q.zone.gw?'good':d<0?'early':'late',x);
+  }else if(q.kind==='launch'){
+    if(q.st==='wait'){q.res='jump';q.st='sum';q.wait=1.4;renderQT();}
+    else if(q.st==='aim'){q.rt=q.el;q.res=q.rt<=0.25?'perfect':q.rt<=0.45?'good':'slow';q.st='sum';q.wait=1.3;renderQT();}
+  }
 }
-function qtBrakeGrade(g,x){const q=G.qt;q.res=g;q.hx=x;q.st='sum';q.wait=1.3;renderQT();}
+function qtBarGrade(g,x){const q=G.qt;q.res=g;q.hx=x;q.st='sum';q.wait=1.3;renderQT();}
+// fuel: hold to pump, let go on the target
+function qtHold(on){
+  const q=G&&G.qt;if(!q||q.kind!=='fuel'||q.st!=='aim')return;
+  if(on){if(!q.hold&&q.ht===0)q.hold=true;}
+  else if(q.hold)qtFuelGrade();
+  renderQT();
+}
+function qtFuelGrade(){
+  const q=G.qt,e=q.ht-FUEL_T;q.hold=false;
+  q.res=Math.abs(e)<=0.08?'perfect':Math.abs(e)<=0.2?'good':e<0?'under':'over';
+  q.st='sum';q.wait=1.3;
+}
+const qtLevel=q=>q.from+(q.to-q.from)*q.ht/FUEL_T;
 function qtSteer(dir){
-  const q=G&&G.qt;if(!q||q.kind!=='spin'||q.st!=='aim')return;
-  q.res.push(dir===q.seq[q.i]);q.st='flash';q.wait=0.4;renderQT();
+  const q=G&&G.qt;if(!q||q.st!=='aim'||(q.kind!=='spin'&&q.kind!=='swap'))return;
+  if(q.kind==='spin')q.res.push(dir===q.seq[q.i]);
+  else q.res.push(dir!==q.seq[q.i]?'miss':q.el<=0.5?'perfect':'good');
+  q.st='flash';q.wait=0.4;renderQT();
 }
 function qtTick(dt){
   const q=G.qt;
-  if(q.st==='aim'){
+  if(q.st==='aim'||q.st==='wait'){
     q.el+=dt;
-    if(q.kind==='brake'){if(qtX(q)>=1)qtBrakeGrade('late',1);}
-    else if(q.el>SPIN_WIN[q.i]){q.res.push(false);q.st='flash';q.wait=0.4;}
+    if(q.kind==='brake'||q.kind==='limit'){if(qtX(q)>=1)qtBarGrade('late',1);}
+    else if(q.kind==='fuel'){
+      if(q.hold){q.ht+=dt;if(q.ht>=FUEL_T*1.8)qtFuelGrade();}
+      else if(q.el>3){q.res='auto';q.st='sum';q.wait=1.3;}
+    }else if(q.kind==='launch'){
+      if(q.st==='wait'&&q.el>=q.go){q.st='aim';q.el=0;}
+      else if(q.st==='aim'&&q.el>1.5){q.rt=q.el;q.res='slow';q.st='sum';q.wait=1.3;}
+    }else if(q.el>(q.kind==='swap'?SWAP_WIN:SPIN_WIN[q.i])){q.res.push(q.kind==='swap'?'miss':false);q.st='flash';q.wait=0.4;}
   }else{
     q.wait-=dt;
     if(q.wait<=0){
@@ -1666,49 +1743,136 @@ function qtTick(dt){
   }
   renderQT();
 }
+// add (or take away) stationary time in one pit-stop phase, keeping later pit games in step
+function pitDelta(c,phase,d){
+  const sv=c.svc,ph=sv&&sv.phases.find(p=>p[0]===phase);
+  if(ph){d=Math.max(-ph[1]*0.8,d);ph[1]+=d;}else d=Math.max(0,d);
+  c.pitTimer+=d;c.pitTotal+=d;c.pitTime+=d;
+  if(sv&&sv.queue)sv.queue.forEach(x=>{x.at+=d;});
+  return d;
+}
+const sgn=d=>(d<=0?'慳咗 ':'蝕咗 ')+Math.abs(d).toFixed(1)+'s';
 function qtClose(){
   const q=G.qt,c=me();G.qt=null;
+  const st=k=>{c.qtStats=c.qtStats||{};const o=c.qtStats[k]||(c.qtStats[k]={n:0,p:0});o.n++;if(q.res==='perfect')o.p++;};
   if(q.kind==='brake'){
     const o=G.cars[q.data.r],b=BRAKE[q.res],win=q.res==='perfect'||rnd()<clamp(q.p+b.w,0.05,0.95);
     c.brkN=(c.brkN||0)+1;if(q.res==='perfect')c.brkPerf=(c.brkPerf||0)+1;
     if(o.state!=='run')radio('工程師','機會冇咗，對手已經唔喺度。','team');
     else (q.data.side==='attack'?attackOutcome:defendOutcome)(c,o,win,b.crash);
-  }else{
+  }else if(q.kind==='spin'){
     const ok=q.res.filter(Boolean).length,{r,where}=q.data;
     c.saveN=(c.saveN||0)+1;
     if(ok===3){c.saveOk=(c.saveOk||0)+1;c.incidents--;const lost=rr(1.5,3);c.delay+=lost;radio(who(c),`喺 ${where} 甩尾，救返！只係蝕咗 ${lost.toFixed(1)} 秒。`,'go');}
     else if(ok===2){const lost=rr(5,9);c.delay+=lost;radio(who(c),`喺 ${where} 打咗半個轉，車冇事，蝕咗 ${Math.round(lost)} 秒。`,'bad');}
     else incidentHit(c,r,where);
+  }else if(q.kind==='limit'){
+    st('limit');
+    if(q.res==='late'){c.penalty+=15;radio('賽事',`#${c.num} 維修站超速：罰 15 秒，下次入站執行。`,'bad');}
+    else{
+      const d=pitDelta(c,'in',q.res==='early'?Math.min(3,(q.zone.c-q.hx)*8):LIMIT[q.res].d);
+      radio('維修站',`入站限速：${LIMIT[q.res].label}，${sgn(d)}。`,d<=0?'go':'bad');
+    }
+  }else if(q.kind==='fuel'){
+    st('fuel');
+    let d=0,extra='';
+    if(q.res==='perfect')d=-1;
+    else if(q.res==='under'){const miss=Math.max(0,c.svc.fuelTo-qtLevel(q));c.fuel=Math.max(0.02,c.fuel-miss);d=-miss*100*REFUEL_RATE*0.5;extra=`，少咗 ${Math.round(miss*100)}%（約 ${(miss/fuelPerLap(c)).toFixed(1)} 圈）`;}
+    else if(q.res==='over')d=2+Math.min(3,(q.ht-FUEL_T)*3);
+    else if(q.res==='auto')d=1.5;
+    d=pitDelta(c,'fuel',d);
+    radio('維修站',`入油：${FUEL[q.res]}${extra}，${sgn(d)}。`,q.res==='perfect'||q.res==='good'?'go':'bad');
+  }else if(q.kind==='swap'){
+    const n=g=>q.res.filter(x=>x===g).length;
+    c.qtStats=c.qtStats||{};const o=c.qtStats.swap||(c.qtStats.swap={n:0,p:0});o.n++;if(n('perfect')===q.seq.length)o.p++;
+    const d=pitDelta(c,'fuel',q.res.reduce((a,g)=>a+SWAP_SCORE[g],0));
+    radio('維修站',`換車手：${n('perfect')} 步完美${n('miss')?`、${n('miss')} 步出錯`:''}，${sgn(d)}。`,d<=0?'go':'bad');
+  }else if(q.kind==='launch'){
+    st('launch');
+    const what=q.data.restart?'重新起步':'起步';
+    if(q.res==='jump'){c.penalty+=10;radio('賽事',`#${c.num} ${what}偷步：罰 10 秒，下次入站執行。`,'bad');}
+    else if(q.res==='perfect'){addMod(c,-2,c.curLT);radio(who(c),`${what}反應 ${q.rt.toFixed(2)}s，一出彎就壓住前車！`,'go');}
+    else if(q.res==='good'){addMod(c,-0.8,c.curLT);radio(who(c),`${what}反應 ${q.rt.toFixed(2)}s，起步唔錯。`,'go');}
+    else{const lost=0.5+q.rt*1.5;c.delay+=lost;radio(who(c),`${what}慢咗（${q.rt.toFixed(2)}s），蝕咗 ${lost.toFixed(1)} 秒。`,'bad');}
   }
   renderQT();renderSlow();
 }
+const QT_PANES=['qtBrake','qtFuel','qtLaunch','qtSpin','qtSwap'];
+function qtPane(id){QT_PANES.forEach(k=>{$('#'+k).hidden=k!==id;});}
 function renderQT(){
   const el=$('#qt'),q=G&&G.running?G.qt:null;
   if(!q){el.hidden=true;return;}
   el.hidden=false;el.dataset.k=q.kind;
-  const brake=q.kind==='brake',g=$('#qtGrade');
-  $('#qtBrake').hidden=!brake;$('#qtSpin').hidden=brake;$('#qtHit').hidden=!brake;
-  if(brake){
-    const o=G.cars[q.data.r],z=q.zone;
-    $('#qtTag').textContent=q.data.side==='attack'?'剎車點 · 攻擊':'剎車點 · 防守';
-    $('#qtTitle').textContent=q.data.side==='attack'?`剎遲過 #${o.num}！`:`守住內線，唔好俾 #${o.num} 剎入嚟！`;
-    $('#qtDots').innerHTML='';
+  const g=$('#qtGrade'),hit=$('#qtHit'),k=q.kind;
+  const setHit=(txt,key)=>{hit.hidden=false;hit.innerHTML=`${txt}<kbd>${key||'空白鍵'}</kbd>`;};
+  $('#qtDots').innerHTML='';
+  if(k==='brake'||k==='limit'){
+    qtPane('qtBrake');
+    const z=q.zone,brake=k==='brake';
+    if(brake){
+      const o=G.cars[q.data.r];
+      $('#qtTag').textContent=q.data.side==='attack'?'剎車點 · 攻擊':'剎車點 · 防守';
+      $('#qtTitle').textContent=q.data.side==='attack'?`剎遲過 #${o.num}！`:`守住內線，唔好俾 #${o.num} 剎入嚟！`;
+    }else{$('#qtTag').textContent='維修站限速';$('#qtTitle').textContent='過白線前開限速器！';}
     $('#qZoneG').style.cssText=`left:${((z.c-z.gw)*100).toFixed(2)}%;width:${(z.gw*200).toFixed(2)}%`;
     $('#qZoneP').style.cssText=`left:${((z.c-z.pw)*100).toFixed(2)}%;width:${(z.pw*200).toFixed(2)}%`;
-    [['#qS150',0.36],['#qS100',0.24],['#qS50',0.12]].forEach(([id,k])=>{$(id).style.left=((z.c-k)*100).toFixed(2)+'%';});
-    $('#qApex').style.left=Math.min(98,(z.c+0.12)*100).toFixed(2)+'%';
+    [['#qS150',0.36],['#qS100',0.24],['#qS50',0.12]].forEach(([id,kk])=>{const s2=$(id);s2.hidden=!brake;s2.style.left=((z.c-kk)*100).toFixed(2)+'%';});
+    $('#qApex').hidden=!brake;$('#qApex').style.left=Math.min(98,(z.c+0.12)*100).toFixed(2)+'%';
+    $('#qLine').hidden=brake;$('#qLine').style.left=(z.c*100).toFixed(2)+'%';
     const x=q.st==='aim'?qtX(q):q.hx;
     $('#qCursor').style.left=(clamp(x,0,1)*100).toFixed(2)+'%';
     $('#qTrack').className='mini-track qt-road'+(q.res?' fl-'+(q.res==='early'?'miss':q.res):'');
     $('#qtBar').style.width=(q.st==='aim'?(1-clamp(x,0,1))*100:0)+'%';
-    if(q.res){g.className='mini-g '+(q.res==='early'?'miss':q.res);g.textContent=BRAKE[q.res].label;}
-    else{g.className='mini-g';g.textContent=`基本成功率 ${pct(q.p)}`;}
-    $('#qtHit').disabled=q.st!=='aim';
-    $('#qtNote').textContent='綠色＝完美，一定成功；橙色都加分。太早剎會蝕機會，太遲剎會衝過位，有機會撞車。';
+    if(q.res){g.className='mini-g '+(q.res==='early'?'miss':q.res);g.textContent=(brake?BRAKE:LIMIT)[q.res].label;}
+    else{g.className='mini-g';g.textContent=brake?`基本成功率 ${pct(q.p)}`:`${Math.max(40,Math.round(300-240*x/z.c))} km/h`;}
+    setHit(brake?'剎！':'限速！');hit.disabled=q.st!=='aim';
+    $('#qtNote').textContent=brake?'綠色＝完美，一定成功；橙色都加分。太早剎會蝕機會，太遲剎會衝過位，有機會撞車。'
+      :'白線前一刻開限速器最快。太早開會慢慢爬入站，過咗線先開就係超速，罰 15 秒。';
+  }else if(k==='fuel'){
+    qtPane('qtFuel');
+    $('#qtTag').textContent='入油';$('#qtTitle').textContent=`按住入油，入到 ${Math.round(q.to*100)}% 就放手！`;
+    const lv=q.res==='auto'?q.to:qtLevel(q),tol=(q.to-q.from)*0.08/FUEL_T;
+    $('#qgFill').style.width=(clamp(lv,0,1)*100).toFixed(2)+'%';
+    $('#qgTgt').style.left=(q.to*100).toFixed(2)+'%';
+    $('#qgOk').style.cssText=`left:${((q.to-tol)*100).toFixed(2)}%;width:${(tol*200).toFixed(2)}%`;
+    $('#qgTxt').textContent=Math.round(Math.min(lv,1)*100)+'%';
+    $('#qGauge').className='qt-gauge'+(lv>q.to+tol?' over':'');
+    $('#qtBar').style.width=(q.st==='aim'&&!q.hold&&q.ht===0?(1-clamp(q.el/3,0,1))*100:0)+'%';
+    if(q.res){g.className='mini-g '+(q.res==='perfect'?'perfect':q.res==='good'?'good':'miss');g.textContent=FUEL[q.res];}
+    else{g.className='mini-g';g.textContent=q.hold?'入緊油⋯':`而家 ${Math.round(q.from*100)}% → 目標 ${Math.round(q.to*100)}%`;}
+    setHit(q.hold?'放手！':'按住入油');hit.disabled=q.st!=='aim';
+    $('#qtNote').textContent='按住掣（或者空白鍵）入油，條油喺綠色位就放手。太早放少咗油，太遲放會溢出嚟要清理。';
+  }else if(k==='launch'){
+    qtPane('qtLaunch');
+    $('#qtTag').textContent=q.data.restart?'重新起步':'滾動起步';
+    $('#qtTitle').textContent=q.data.restart?'安全車入站，綠旗一揮即刻扒油！':'安全車帶頭，綠旗一揮即刻扒油！';
+    const f=$('#qtFlag');
+    if(q.res==='jump'){f.className='qt-flag bad';f.textContent='偷步！';}
+    else if(q.st==='wait'){f.className='qt-flag';f.textContent='準備⋯';}
+    else{f.className='qt-flag go';f.textContent='綠旗 GO!';}
+    $('#qtBar').style.width=(q.st==='aim'?(1-clamp(q.el/1.5,0,1))*100:0)+'%';
+    if(q.res){g.className='mini-g '+(q.res==='perfect'?'perfect':q.res==='good'?'good':'miss');g.textContent=LAUNCH[q.res]+(q.rt!=null&&q.res!=='jump'?` · ${q.rt.toFixed(2)}s`:'');}
+    else{g.className='mini-g';g.textContent=q.st==='wait'?'等綠旗⋯ 唔好偷步':'GO！';}
+    setHit('油門！');hit.disabled=!!q.res;
+    $('#qtNote').textContent='綠旗出現先撳。0.25 秒內＝完美，可以壓住前車；綠旗前撳就係偷步，罰 10 秒。';
+  }else if(k==='swap'){
+    qtPane('qtSwap');hit.hidden=true;
+    const sw=q.data.swap;
+    $('#qtTag').textContent='換車手';$('#qtTitle').textContent=sw?`${sw[0]} 落車，${sw[1]} 上車！`:'換車手！';
+    $('#qtDots').innerHTML=q.seq.map((_,i)=>`<i class="${i<q.res.length?(q.res[i]==='miss'?'bad':'ok'):i===q.i&&q.st==='aim'?'now':''}"></i>`).join('');
+    const a=$('#qtSwapBig'),i=Math.min(q.i,q.seq.length-1);
+    if(q.st==='sum'){const d=q.res.reduce((s2,x)=>s2+SWAP_SCORE[x],0);a.className='qt-big '+(d<=0?'ok':'bad');a.innerHTML=`${d<=0?'−':'+'}${Math.abs(d).toFixed(1)}s<small>換人完成</small>`;}
+    else if(q.st==='flash'){const r=q.res[q.res.length-1];a.className='qt-big '+(r==='miss'?'bad':'ok');a.innerHTML=`${r==='miss'?'✗':'✓'}<small>${r==='perfect'?'快！':r==='good'?'OK':'錯／太慢'}</small>`;}
+    else{a.className='qt-big';a.innerHTML=`${DIR_CH[q.seq[i]]}<small>${SWAP_STEPS[i]}</small>`;}
+    document.querySelectorAll('#qtSwap .qt-arr').forEach(b=>{b.disabled=q.st!=='aim';});
+    $('#qtBar').style.width=(q.st==='aim'?(1-clamp(q.el/SWAP_WIN,0,1))*100:0)+'%';
+    g.className='mini-g';g.textContent=`${Math.min(q.i+1,q.seq.length)} / ${q.seq.length} · ${SWAP_STEPS[i]}`;
+    $('#qtNote').textContent='跟住箭咀撳方向鍵（← ↑ ↓ →）或者㩒掣。0.5 秒內＝快（−0.8s），錯或者太慢 +2s。';
   }else{
+    qtPane('qtSpin');hit.hidden=true;
     $('#qtTag').textContent='救車';
     $('#qtTitle').textContent=`喺 ${q.data.where} 甩尾！快啲反軚！`;
-    $('#qtDots').innerHTML=q.seq.map((_,k)=>`<i class="${k<q.res.length?(q.res[k]?'ok':'bad'):k===q.i&&q.st==='aim'?'now':''}"></i>`).join('');
+    $('#qtDots').innerHTML=q.seq.map((_,i)=>`<i class="${i<q.res.length?(q.res[i]?'ok':'bad'):i===q.i&&q.st==='aim'?'now':''}"></i>`).join('');
     const a=$('#qtArrow'),i=Math.min(q.i,q.seq.length-1);
     if(q.st==='sum'){const ok=q.res.filter(Boolean).length;a.className='qt-big '+(ok===3?'ok':ok===2?'':'bad');a.innerHTML=`${ok}/3<small>${ok===3?'救返！':ok===2?'打咗半個轉':'救唔切'}</small>`;}
     else if(q.st==='flash'){const r=q.res[q.res.length-1];a.className='qt-big '+(r?'ok':'bad');a.innerHTML=`${r?'✓':'✗'}<small>${r?'啱':'錯／太慢'}</small>`;}
@@ -2436,6 +2600,8 @@ function showEnd(){
     ['入站次數',c.stops],['維修站總時間',fmtMS(c.pitTime)],['個人最快',fmtLap(c.best)],
     ['意外',inc],['爬頭 / 被爬',`${c.passes||0} / ${c.passedBy||0}`],['攻防成功',`${c.callWin||0} / ${c.callTry||0}`],
     ['換胎完美',`${c.miniPerf||0} / ${c.miniN||0}`],['完美剎車點',`${c.brkPerf||0} / ${c.brkN||0}`],['救車成功',`${c.saveOk||0} / ${c.saveN||0}`],
+    ['完美入油',`${(c.qtStats&&c.qtStats.fuel||{}).p||0} / ${(c.qtStats&&c.qtStats.fuel||{}).n||0}`],['完美換人',`${(c.qtStats&&c.qtStats.swap||{}).p||0} / ${(c.qtStats&&c.qtStats.swap||{}).n||0}`],
+    ['完美限速',`${(c.qtStats&&c.qtStats.limit||{}).p||0} / ${(c.qtStats&&c.qtStats.limit||{}).n||0}`],['完美起步',`${(c.qtStats&&c.qtStats.launch||{}).p||0} / ${(c.qtStats&&c.qtStats.launch||{}).n||0}`],
     ['最快停站',c.fastStop?c.fastStop.toFixed(1)+'s':'—'],['工程師抉擇',G.callsMade||0]
   ].map(([k,v])=>`<div><b>${v}</b><small>${k}</small></div>`).join('');
   // position chart
@@ -2576,7 +2742,7 @@ function bindUI(){
       g.querySelectorAll('button[data-val]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
     });
   });
-  $('#startForm').addEventListener('submit',ev=>{ev.preventDefault();newGame();logPlay();});
+  $('#startForm').addEventListener('submit',ev=>{ev.preventDefault();newGame();logPlay();if(qtOn())qtStart('launch',{restart:false});});
   $('#btnBoardStart').addEventListener('click',()=>openBoard(START.diff));
   $('#btnBoardEnd').addEventListener('click',()=>openBoard(G?G.opt.diff:START.diff));
   $('#lbClose').addEventListener('click',closeBoard);
@@ -2594,9 +2760,12 @@ function bindUI(){
   $('#optPitCam').addEventListener('change',e=>{if(G)G.opt.pitCam=e.target.checked;});
   $('#optMini').addEventListener('change',e=>{if(G)G.opt.mini=e.target.checked;});
   $('#miniHit').addEventListener('pointerdown',e=>{e.preventDefault();miniHit();});
-  $('#qtHit').addEventListener('pointerdown',e=>{e.preventDefault();qtHit();});
+  $('#qtHit').addEventListener('pointerdown',e=>{e.preventDefault();if(G&&G.qt&&G.qt.kind==='fuel')qtHold(true);else qtHit();});
   $('#qTrack').addEventListener('pointerdown',e=>{e.preventDefault();qtHit();});
-  document.querySelectorAll('#qtSpin .qt-arr').forEach(b=>b.addEventListener('pointerdown',e=>{e.preventDefault();qtSteer(+b.dataset.d);}));
+  $('#qGauge').addEventListener('pointerdown',e=>{e.preventDefault();qtHold(true);});
+  ['pointerup','pointercancel'].forEach(t=>document.addEventListener(t,()=>qtHold(false)));
+  document.addEventListener('keyup',e=>{if(e.key===' '||e.key==='Enter')qtHold(false);});
+  document.querySelectorAll('#qtSpin .qt-arr, #qtSwap .qt-arr').forEach(b=>b.addEventListener('pointerdown',e=>{e.preventDefault();qtSteer(+b.dataset.d);}));
   $('#mTrack').addEventListener('pointerdown',e=>{e.preventDefault();miniHit();});
   $('#miniHit').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();}});
   $('#pcSkip').addEventListener('click',()=>{if(G)G.pitSkip=true;STAGE.hud();});
@@ -2630,9 +2799,9 @@ function bindUI(){
     if(G.mini&&G.running){if(ev.key===' '||ev.key==='Enter'){ev.preventDefault();if(!ev.repeat)miniHit();}return;}
     if(G.qt&&G.running){
       if(ev.repeat)return;
-      if(ev.key===' '||ev.key==='Enter'){ev.preventDefault();qtHit();}
-      else if(ev.key==='ArrowLeft'||ev.key==='a'||ev.key==='A'){ev.preventDefault();qtSteer(-1);}
-      else if(ev.key==='ArrowRight'||ev.key==='d'||ev.key==='D'){ev.preventDefault();qtSteer(1);}
+      const dir={ArrowLeft:-1,a:-1,A:-1,ArrowRight:1,d:1,D:1,ArrowUp:-2,w:-2,W:-2,ArrowDown:2,s:2,S:2}[ev.key];
+      if(ev.key===' '||ev.key==='Enter'){ev.preventDefault();if(G.qt.kind==='fuel')qtHold(true);else qtHit();}
+      else if(dir){ev.preventDefault();qtSteer(dir);}
       return;
     }
     if(G.modal==='pit'){if(ev.key==='Enter'&&tag!=='button'){ev.preventDefault();commitPit();}return;}
